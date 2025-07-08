@@ -12,8 +12,8 @@ canvas.height = SCREEN_HEIGHT_GRIDS * GRID_SIZE;
 const GROUND_Y_GRIDS = SCREEN_HEIGHT_GRIDS - 1;
 const CHAR_SIZE_GRIDS = 1;
 const CHAR_SPEED_GRIDS = 0.5;
-const BULLET_SIZE_GRIDS = 0.5;
-const BULLET_SPEED_GRIDS = 1;
+const TONGUE_WIDTH_GRIDS = 0.5;
+const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
 const BALL_SPEED_GRIDS = 0.05;
 const BALL_SPAWN_INTERVAL = 2000; // ms
@@ -45,8 +45,18 @@ const player = {
     currentFrame: 0
 };
 
-// Bullets
-const bullets = [];
+// Tongue
+const tongue = {
+    xGrids: 0, // Base X (player's mouth)
+    yGrids: 0, // Base Y (player's mouth)
+    currentLength: 0,
+    isExtending: false,
+    isRetracting: false,
+    speed: TONGUE_SPEED_GRIDS, // Max length of the tongue
+    direction: 1, // 1 for right, -1 for left
+    tipXGrids: 0,
+    tipYGrids: 0
+};
 // Balls
 const balls = [];
 // Holes
@@ -66,7 +76,10 @@ function keyDown(e) {
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         keys.left = true;
     } else if (e.key === 'Enter') {
-        fireBullet();
+        if (!tongue.isExtending && !tongue.isRetracting) {
+            tongue.isExtending = true;
+            tongue.direction = player.direction;
+        }
     }
 }
 
@@ -76,26 +89,18 @@ function keyUp(e) {
         keys.right = false;
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         keys.left = false;
+    } else if (key === 'enter') {
+        if (tongue.isExtending) {
+            tongue.isExtending = false;
+            tongue.isRetracting = true;
+        }
     }
 }
 
 document.addEventListener('keydown', keyDown);
 document.addEventListener('keyup', keyUp);
 
-function fireBullet() {
-    if (bullets.length > 0) {
-        return;
-    }
-    const bullet = {
-        xGrids: player.xGrids + player.widthGrids / 2 - BULLET_SIZE_GRIDS / 2,
-        yGrids: player.yGrids,
-        widthGrids: BULLET_SIZE_GRIDS,
-        heightGrids: BULLET_SIZE_GRIDS,
-        dxGrids: player.direction * BULLET_SPEED_GRIDS * Math.cos(Math.PI / 4),
-        dyGrids: -BULLET_SPEED_GRIDS * Math.sin(Math.PI / 4)
-    };
-    bullets.push(bullet);
-}
+
 
 function spawnBall() {
     if (gameOver) return;
@@ -146,11 +151,47 @@ function drawGround() {
     }
 }
 
-function drawBullets() {
-    ctx.fillStyle = 'red';
-    bullets.forEach(bullet => {
-        ctx.fillRect(gridToPx(bullet.xGrids), gridToPx(bullet.yGrids), gridToPx(bullet.widthGrids), gridToPx(bullet.heightGrids));
-    });
+function drawTongue() {
+    if (tongue.isExtending || tongue.isRetracting || tongue.currentLength > 0) {
+        ctx.strokeStyle = 'pink';
+        ctx.lineWidth = gridToPx(TONGUE_WIDTH_GRIDS);
+        ctx.beginPath();
+        ctx.moveTo(gridToPx(tongue.xGrids), gridToPx(tongue.yGrids));
+        ctx.lineTo(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids));
+        ctx.stroke();
+    }
+}
+
+function moveTongue() {
+    // Set tongue base to player's mouth
+    tongue.xGrids = player.xGrids + player.widthGrids / 2;
+    tongue.yGrids = player.yGrids + player.heightGrids / 2;
+
+    if (tongue.isExtending) {
+        tongue.currentLength += tongue.speed;
+
+        // Check if tongue tip hits screen boundaries
+        if (tongue.tipXGrids < 0 || tongue.tipXGrids > SCREEN_WIDTH_GRIDS || tongue.tipYGrids < 0) {
+            tongue.isExtending = false;
+            tongue.isRetracting = true;
+        }
+    } else if (tongue.isRetracting) {
+        tongue.currentLength -= tongue.speed;
+        if (tongue.currentLength <= 0) {
+            tongue.currentLength = 0;
+            tongue.isRetracting = false;
+        }
+    }
+
+    // Calculate tongue tip position based on angle
+    const angle = Math.PI / 4; // 45 degrees
+    if (tongue.direction === 1) { // Right
+        tongue.tipXGrids = tongue.xGrids + tongue.currentLength * Math.cos(angle);
+        tongue.tipYGrids = tongue.yGrids - tongue.currentLength * Math.sin(angle);
+    } else { // Left
+        tongue.tipXGrids = tongue.xGrids - tongue.currentLength * Math.cos(angle);
+        tongue.tipYGrids = tongue.yGrids - tongue.currentLength * Math.sin(angle);
+    }
 }
 
 function drawBalls() {
@@ -202,17 +243,7 @@ function movePlayer() {
     }
 }
 
-function moveBullets() {
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        const bullet = bullets[i];
-        bullet.xGrids += bullet.dxGrids;
-        bullet.yGrids += bullet.dyGrids;
 
-        if (bullet.yGrids + bullet.heightGrids < 0 || bullet.xGrids + bullet.widthGrids < 0 || bullet.xGrids > SCREEN_WIDTH_GRIDS) {
-            bullets.splice(i, 1);
-        }
-    }
-}
 
 function moveBalls() {
     for (let i = balls.length - 1; i >= 0; i--) {
@@ -227,17 +258,15 @@ function moveBalls() {
 }
 
 function checkCollisions() {
-    // Bullet-Ball collision
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        for (let j = balls.length - 1; j >= 0; j--) {
-            const bullet = bullets[i];
-            const ball = balls[j];
+    // Tongue-Ball collision
+    if (tongue.isExtending) {
+        for (let i = balls.length - 1; i >= 0; i--) {
+            const ball = balls[i];
+            const tongueTipX = tongue.direction === 1 ? tongue.xGrids + tongue.widthGrids : tongue.xGrids;
 
-            if (bullet && ball && bullet.xGrids < ball.xGrids + ball.widthGrids &&
-                bullet.xGrids + bullet.widthGrids > ball.xGrids &&
-                bullet.yGrids < ball.yGrids + ball.heightGrids &&
-                bullet.yGrids + bullet.heightGrids > ball.yGrids) {
-                
+            if (tongue.tipXGrids > ball.xGrids && tongue.tipXGrids < ball.xGrids + ball.widthGrids &&
+                tongue.tipYGrids > ball.yGrids && tongue.tipYGrids < ball.yGrids + ball.heightGrids) {
+
                 if (ball.type === 'repair') {
                     if (holes.length > 0) {
                         const randomIndex = Math.floor(Math.random() * holes.length);
@@ -247,8 +276,9 @@ function checkCollisions() {
                     score++;
                 }
 
-                bullets.splice(i, 1);
-                balls.splice(j, 1);
+                balls.splice(i, 1);
+                tongue.isExtending = false;
+                tongue.isRetracting = true;
             }
         }
     }
@@ -309,11 +339,11 @@ function update(currentTime) {
 
     drawGround();
     drawPlayer();
-    drawBullets();
+    drawTongue();
     drawBalls();
     drawScore();
 
-    moveBullets();
+    moveTongue();
     moveBalls();
     checkCollisions();
 
