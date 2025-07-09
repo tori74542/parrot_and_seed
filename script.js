@@ -104,13 +104,21 @@ document.addEventListener('keyup', keyUp);
 
 function spawnBall() {
     if (gameOver) return;
-    const isRepairBall = Math.random() < 0.2; // 20% chance for a repair ball
+    const rand = Math.random();
+    let ballType;
+    if (rand < 0.05) { // 5% chance for a clear ball
+        ballType = 'clear';
+    } else if (rand < 0.20) { // 15% chance for a repair ball
+        ballType = 'repair';
+    } else { // 80% chance for a normal ball
+        ballType = 'normal';
+    }
     const ball = {
         xGrids: Math.floor(Math.random() * (SCREEN_WIDTH_GRIDS - BALL_SIZE_GRIDS)),
         yGrids: 0,
         widthGrids: BALL_SIZE_GRIDS,
         heightGrids: BALL_SIZE_GRIDS,
-        type: isRepairBall ? 'repair' : 'normal'
+        type: ballType
     };
     balls.push(ball);
 }
@@ -196,7 +204,17 @@ function moveTongue() {
 
 function drawBalls() {
     balls.forEach(ball => {
-        ctx.fillStyle = ball.type === 'repair' ? 'green' : 'blue';
+        switch (ball.type) {
+            case 'clear':
+                ctx.fillStyle = 'yellow';
+                break;
+            case 'repair':
+                ctx.fillStyle = 'green';
+                break;
+            default: // 'normal'
+                ctx.fillStyle = 'blue';
+                break;
+        }
         ctx.beginPath();
         ctx.arc(gridToPx(ball.xGrids + ball.widthGrids / 2), gridToPx(ball.yGrids + ball.heightGrids / 2), gridToPx(ball.widthGrids / 2), 0, Math.PI * 2);
         ctx.fill();
@@ -267,18 +285,69 @@ function checkCollisions() {
             if (tongue.tipXGrids > ball.xGrids && tongue.tipXGrids < ball.xGrids + ball.widthGrids &&
                 tongue.tipYGrids > ball.yGrids && tongue.tipYGrids < ball.yGrids + ball.heightGrids) {
 
+                // Check if the hit ball is a 'clear' ball
+                if (ball.type === 'clear') {
+                    const ballsToClearCount = balls.length;
+                    let holesToRepairCount = ballsToClearCount - 1; // Don't count the clear ball itself
+
+                    // Add score for all balls on screen
+                    for (const b of balls) {
+                        const yPos = b.yGrids;
+                        if (yPos < 5) {
+                            score += 10;
+                        } else if (yPos < 10) {
+                            score += 5;
+                        } else if (yPos < 15) {
+                            score += 3;
+                        } else {
+                            score += 1;
+                        }
+                    }
+
+                    // Repair holes
+                    while (holesToRepairCount > 0 && holes.length > 0) {
+                        let closestHoleIndex = -1;
+                        let minDistance = Infinity;
+                        const playerCenterX = player.xGrids + player.widthGrids / 2;
+
+                        for (let j = 0; j < holes.length; j++) {
+                            const holeX = holes[j];
+                            const distance = Math.abs(playerCenterX - holeX);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestHoleIndex = j;
+                            }
+                        }
+
+                        if (closestHoleIndex !== -1) {
+                            holes.splice(closestHoleIndex, 1);
+                        }
+                        holesToRepairCount--;
+                    }
+
+                    // Clear all balls from the screen
+                    balls.length = 0;
+
+                    // Retract tongue and exit the collision check for this frame
+                    tongue.isExtending = false;
+                    tongue.isRetracting = true;
+                    break; // Exit the for loop
+                }
+
+
+                // --- Logic for 'normal' and 'repair' balls ---
                 if (ball.type === 'repair') {
                     if (holes.length > 0) {
                         let closestHoleIndex = -1;
                         let minDistance = Infinity;
                         const playerCenterX = player.xGrids + player.widthGrids / 2;
 
-                        for (let i = 0; i < holes.length; i++) {
-                            const holeX = holes[i];
+                        for (let j = 0; j < holes.length; j++) {
+                            const holeX = holes[j];
                             const distance = Math.abs(playerCenterX - holeX);
                             if (distance < minDistance) {
                                 minDistance = distance;
-                                closestHoleIndex = i;
+                                closestHoleIndex = j;
                             }
                         }
 
