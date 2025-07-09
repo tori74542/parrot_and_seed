@@ -12,17 +12,18 @@ canvas.height = SCREEN_HEIGHT_GRIDS * GRID_SIZE;
 const GROUND_Y_GRIDS = SCREEN_HEIGHT_GRIDS - 1;
 const CHAR_SIZE_GRIDS = 1;
 const CHAR_SPEED_GRIDS = 0.5;
-const TONGUE_WIDTH_GRIDS = 0.5;
+const TONGUE_WIDTH_GRIDS = 0.2;
 const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
 const BALL_SPEED_GRIDS = 0.05;
 const BALL_SPAWN_INTERVAL = 2000; // ms
 
 // Animation constants
-const PLAYER_SPRITE_WIDTH = 40;
-const PLAYER_SPRITE_HEIGHT = 40;
-const PLAYER_WALK_FRAMES = 4;
+const PLAYER_SPRITE_WIDTH = 128;
+const PLAYER_SPRITE_HEIGHT = 128;
+const PLAYER_WALK_FRAMES = 10;
 const PLAYER_ANIMATION_SPEED = 100; // ms per frame
+const PLAYER_DRAW_SCALE = 1.5;
 
 // Game state
 let score = 0;
@@ -31,8 +32,11 @@ let animationFrameId;
 let lastAnimationTime = 0;
 
 // Player sprite
-const playerSprite = new Image();
-playerSprite.src = 'image.png';
+const playerSpriteRight = new Image();
+playerSpriteRight.src = 'parrot_right.png';
+
+const playerSpriteLeft = new Image();
+playerSpriteLeft.src = 'parrot_left.png';
 
 // Player
 const player = {
@@ -133,20 +137,32 @@ function gridToPx(gridValue) {
 }
 
 function drawPlayer() {
-    let spriteRow = 0;
+    let currentSprite = playerSpriteRight;
     if (player.direction === -1) {
-        spriteRow = 1;
+        currentSprite = playerSpriteLeft;
     }
 
     const sx = player.currentFrame * PLAYER_SPRITE_WIDTH;
-    const sy = spriteRow * PLAYER_SPRITE_HEIGHT;
+    const sy = 0; // Always 0 as sprites are now single row
 
-    ctx.drawImage(playerSprite, sx, sy, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, gridToPx(player.xGrids), gridToPx(player.yGrids), gridToPx(player.widthGrids), gridToPx(player.heightGrids));
+    // Calculate scaled dimensions for drawing
+    const baseWidthPx = gridToPx(player.widthGrids);
+    const baseHeightPx = gridToPx(player.heightGrids);
+    const drawWidthPx = baseWidthPx * PLAYER_DRAW_SCALE;
+    const drawHeightPx = baseHeightPx * PLAYER_DRAW_SCALE;
+
+    // Adjust position to keep the character centered on its logical position
+    const xOffset = (drawWidthPx - baseWidthPx) / 2;
+    const yOffset = (drawHeightPx - baseHeightPx) / 2;
+    const drawX = gridToPx(player.xGrids) - xOffset;
+    const drawY = gridToPx(player.yGrids) - yOffset;
+
+    ctx.drawImage(currentSprite, sx, sy, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, drawX, drawY, drawWidthPx, drawHeightPx);
 }
 
 function drawGround() {
-    const groundBlockColor = '#8B4513'; // SaddleBrown
-    const groundBlockBorder = '#2F4F4F'; // DarkSlateGray
+    const groundBlockColor = '#62614C';
+    const groundBlockBorder = '#030000';
 
     for (let x = 0; x < SCREEN_WIDTH_GRIDS; x++) {
         if (holes.includes(x)) {
@@ -227,8 +243,20 @@ function drawBalls() {
 
 function drawScore() {
     ctx.fillStyle = 'black';
-    ctx.font = '20px Arial';
-    ctx.fillText(`Score: ${score}`, 10, 30);
+    ctx.font = '20px "Courier New"'; // フォント変更
+
+    const paddedScore = score.toString().padStart(6, '0');
+    const scoreText = `score ${paddedScore}`;
+
+    // テキストの幅を測定
+    const textMetrics = ctx.measureText(scoreText);
+    const textWidth = textMetrics.width;
+
+    // 中央揃えのX座標を計算
+    const centerX = (canvas.width - textWidth) / 2;
+    const displayY = 30; // Y座標は既存のものを流用
+
+    ctx.fillText(scoreText, centerX, displayY);
 }
 
 function clear() {
@@ -510,8 +538,8 @@ function update(currentTime) {
 
     drawGround();
     drawFallingBlocks();
-    drawPlayer();
     drawTongue();
+    drawPlayer();
     drawBalls();
     drawScore();
 
