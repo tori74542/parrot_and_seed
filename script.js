@@ -309,14 +309,19 @@ const MOVE_INTERVAL = 50; // ms, adjust for desired speed
 function update(currentTime) {
     if (gameOver) return;
 
-    if (keys.right) {
-        player.dxGrids = CHAR_SPEED_GRIDS;
-        player.direction = 1;
-    } else if (keys.left) {
-        player.dxGrids = -CHAR_SPEED_GRIDS;
-        player.direction = -1;
+    // Allow movement only when tongue is not active
+    if (!tongue.isExtending && !tongue.isRetracting) {
+        if (keys.right) {
+            player.dxGrids = CHAR_SPEED_GRIDS;
+            player.direction = 1;
+        } else if (keys.left) {
+            player.dxGrids = -CHAR_SPEED_GRIDS;
+            player.direction = -1;
+        } else {
+            player.dxGrids = 0;
+        }
     } else {
-        player.dxGrids = 0;
+        player.dxGrids = 0; // Ensure player stops when tongue is out
     }
 
     // Update animation frame only if moving
