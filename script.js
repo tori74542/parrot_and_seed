@@ -365,14 +365,8 @@ function checkCollisions() {
 
                         if (closestHoleIndex !== -1) {
                             const holeToRepairX = holes[closestHoleIndex];
-                            // Prevent creating duplicate falling blocks for the same hole
-                            if (!fallingBlocks.some(b => b.xGrids === holeToRepairX)) {
-                                fallingBlocks.push({
-                                    xGrids: holeToRepairX,
-                                    yGrids: 0, // Start from top
-                                    targetYGrids: GROUND_Y_GRIDS
-                                });
-                            }
+                            // Queue the hole for repair
+                            repairQueue.push(holeToRepairX);
                         }
                     }
                 }
@@ -409,14 +403,20 @@ function checkCollisions() {
     }
 }
 
-const FALLING_BLOCK_SPEED_GRIDS = 0.5;
+const FALLING_BLOCK_DURATION = 500; // ms
 
-function moveFallingBlocks() {
+function easeOutQuad(x) {
+    return 1 - (1 - x) * (1 - x);
+}
+
+function moveFallingBlocks(currentTime) {
     for (let i = fallingBlocks.length - 1; i >= 0; i--) {
         const block = fallingBlocks[i];
-        block.yGrids += FALLING_BLOCK_SPEED_GRIDS;
+        const elapsedTime = currentTime - block.startTime;
+        let progress = elapsedTime / block.duration;
 
-        if (block.yGrids >= block.targetYGrids) {
+        if (progress >= 1) {
+            progress = 1;
             // Block has landed. Repair the hole officially.
             const holeIndex = holes.findIndex(h => h === block.xGrids);
             if (holeIndex !== -1) {
@@ -424,7 +424,11 @@ function moveFallingBlocks() {
             }
             // Remove the block from the falling animation
             fallingBlocks.splice(i, 1);
+            continue; // Continue to the next block
         }
+
+        const easedProgress = easeOutQuad(progress);
+        block.yGrids = block.targetYGrids * easedProgress;
     }
 }
 
@@ -449,7 +453,9 @@ function processRepairQueue() {
                 fallingBlocks.push({
                     xGrids: holeX,
                     yGrids: 0,
-                    targetYGrids: GROUND_Y_GRIDS
+                    targetYGrids: GROUND_Y_GRIDS,
+                    startTime: performance.now(),
+                    duration: FALLING_BLOCK_DURATION
                 });
             }
         }
@@ -510,7 +516,7 @@ function update(currentTime) {
     drawScore();
 
     processRepairQueue();
-    moveFallingBlocks();
+    moveFallingBlocks(currentTime);
     moveTongue();
     moveBalls();
     checkCollisions();
