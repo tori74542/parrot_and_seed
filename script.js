@@ -269,11 +269,35 @@ function checkCollisions() {
 
                 if (ball.type === 'repair') {
                     if (holes.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * holes.length);
-                        holes.splice(randomIndex, 1);
+                        let closestHoleIndex = -1;
+                        let minDistance = Infinity;
+                        const playerCenterX = player.xGrids + player.widthGrids / 2;
+
+                        for (let i = 0; i < holes.length; i++) {
+                            const holeX = holes[i];
+                            const distance = Math.abs(playerCenterX - holeX);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestHoleIndex = i;
+                            }
+                        }
+
+                        if (closestHoleIndex !== -1) {
+                            holes.splice(closestHoleIndex, 1);
+                        }
                     }
+                }
+
+                // Add score based on height, regardless of ball type
+                const yPos = ball.yGrids;
+                if (yPos < 5) {
+                    score += 10;
+                } else if (yPos < 10) {
+                    score += 5;
+                } else if (yPos < 15) {
+                    score += 3;
                 } else {
-                    score++;
+                    score += 1;
                 }
 
                 balls.splice(i, 1);
