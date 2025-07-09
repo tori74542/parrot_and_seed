@@ -31,6 +31,11 @@ let gameOver = false;
 let animationFrameId;
 let lastAnimationTime = 0;
 
+// Sound effects
+const tongueSound = new Audio('tongue.mp3');
+tongueSound.preload = 'auto'; // 事前読み込み
+tongueSound.volume = 0.5; // 音量調整 (任意)
+
 // Player sprite
 const playerSpriteRight = new Image();
 playerSpriteRight.src = 'parrot_right.png';
@@ -82,11 +87,14 @@ function keyDown(e) {
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         keys.left = true;
     } else if (e.key === 'Enter') {
-        if (!tongue.isExtending && !tongue.isRetracting) {
-            tongue.isExtending = true;
-            tongue.direction = player.direction;
+            if (!tongue.isExtending && !tongue.isRetracting) {
+                tongue.isExtending = true;
+                tongue.direction = player.direction;
+                // 効果音再生
+                tongueSound.currentTime = 0; // 再生位置を先頭に戻す
+                tongueSound.play();
+            }
         }
-    }
 }
 
 function keyUp(e) {
