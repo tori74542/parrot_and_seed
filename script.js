@@ -61,6 +61,8 @@ const tongue = {
 const balls = [];
 // Holes
 const holes = []; // Stores x-grid positions of holes
+const fallingBlocks = []; // Stores blocks falling to repair holes
+const repairQueue = []; // Stores x-coordinates of holes queued for repair
 
 // Keyboard input
 const keys = {
@@ -304,14 +306,17 @@ function checkCollisions() {
                         }
                     }
 
-                    // Repair holes
-                    while (holesToRepairCount > 0 && holes.length > 0) {
+                    // --- Queue holes for repair for 'clear' ball ---
+                    const tempHoles = [...holes];
+                    const holesToQueue = [];
+
+                    while (holesToRepairCount > 0 && tempHoles.length > 0) {
                         let closestHoleIndex = -1;
                         let minDistance = Infinity;
                         const playerCenterX = player.xGrids + player.widthGrids / 2;
 
-                        for (let j = 0; j < holes.length; j++) {
-                            const holeX = holes[j];
+                        for (let j = 0; j < tempHoles.length; j++) {
+                            const holeX = tempHoles[j];
                             const distance = Math.abs(playerCenterX - holeX);
                             if (distance < minDistance) {
                                 minDistance = distance;
@@ -320,10 +325,17 @@ function checkCollisions() {
                         }
 
                         if (closestHoleIndex !== -1) {
-                            holes.splice(closestHoleIndex, 1);
+                            holesToQueue.push(tempHoles[closestHoleIndex]);
+                            tempHoles.splice(closestHoleIndex, 1);
                         }
                         holesToRepairCount--;
                     }
+
+                    // Add the found holes to the global repair queue
+                    if (holesToQueue.length > 0) {
+                        repairQueue.push(...holesToQueue);
+                    }
+                    // --- End queuing ---
 
                     // Clear all balls from the screen
                     balls.length = 0;
@@ -352,7 +364,15 @@ function checkCollisions() {
                         }
 
                         if (closestHoleIndex !== -1) {
-                            holes.splice(closestHoleIndex, 1);
+                            const holeToRepairX = holes[closestHoleIndex];
+                            // Prevent creating duplicate falling blocks for the same hole
+                            if (!fallingBlocks.some(b => b.xGrids === holeToRepairX)) {
+                                fallingBlocks.push({
+                                    xGrids: holeToRepairX,
+                                    yGrids: 0, // Start from top
+                                    targetYGrids: GROUND_Y_GRIDS
+                                });
+                            }
                         }
                     }
                 }
@@ -385,6 +405,53 @@ function checkCollisions() {
             player.yGrids + player.heightGrids > ball.yGrids) {
             
             endGame();
+        }
+    }
+}
+
+const FALLING_BLOCK_SPEED_GRIDS = 0.5;
+
+function moveFallingBlocks() {
+    for (let i = fallingBlocks.length - 1; i >= 0; i--) {
+        const block = fallingBlocks[i];
+        block.yGrids += FALLING_BLOCK_SPEED_GRIDS;
+
+        if (block.yGrids >= block.targetYGrids) {
+            // Block has landed. Repair the hole officially.
+            const holeIndex = holes.findIndex(h => h === block.xGrids);
+            if (holeIndex !== -1) {
+                holes.splice(holeIndex, 1);
+            }
+            // Remove the block from the falling animation
+            fallingBlocks.splice(i, 1);
+        }
+    }
+}
+
+function drawFallingBlocks() {
+    const blockColor = '#8B4513'; // Same as ground
+    const borderColor = '#2F4F4F';
+    fallingBlocks.forEach(block => {
+        ctx.fillStyle = blockColor;
+        ctx.fillRect(gridToPx(block.xGrids), gridToPx(block.yGrids), GRID_SIZE, GRID_SIZE);
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(gridToPx(block.xGrids), gridToPx(block.yGrids), GRID_SIZE, GRID_SIZE);
+    });
+}
+
+function processRepairQueue() {
+    if (repairQueue.length > 0) {
+        const holeX = repairQueue.shift(); // Get the first hole from the queue
+        if (holeX !== undefined) {
+            // Start the falling block animation for this hole, if not already falling
+            if (!fallingBlocks.some(b => b.xGrids === holeX)) {
+                fallingBlocks.push({
+                    xGrids: holeX,
+                    yGrids: 0,
+                    targetYGrids: GROUND_Y_GRIDS
+                });
+            }
         }
     }
 }
@@ -436,11 +503,14 @@ function update(currentTime) {
     clear();
 
     drawGround();
+    drawFallingBlocks();
     drawPlayer();
     drawTongue();
     drawBalls();
     drawScore();
 
+    processRepairQueue();
+    moveFallingBlocks();
     moveTongue();
     moveBalls();
     checkCollisions();
