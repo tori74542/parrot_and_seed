@@ -174,7 +174,7 @@ function drawPlayer() {
     const xOffset = (drawWidthPx - baseWidthPx) / 2;
     const yOffset = (drawHeightPx - baseHeightPx) / 2;
     const drawX = gridToPx(player.xGrids) - xOffset;
-    const drawY = gridToPx(player.yGrids) - yOffset;
+    const drawY = gridToPx(player.yGrids) - yOffset - gridToPx(0.25); // 0.25グリッド分上にずらす
 
     ctx.drawImage(currentSprite, sx, sy, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, drawX, drawY, drawWidthPx, drawHeightPx);
 
