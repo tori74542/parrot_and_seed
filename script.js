@@ -43,6 +43,9 @@ playerSpriteRight.src = 'parrot_right.png';
 const playerSpriteLeft = new Image();
 playerSpriteLeft.src = 'parrot_left.png';
 
+const seedSprite = new Image();
+seedSprite.src = 'seed.png';
+
 // Player
 const player = {
     xGrids: SCREEN_WIDTH_GRIDS / 2 - CHAR_SIZE_GRIDS / 2,
@@ -132,7 +135,10 @@ function spawnBall() {
         yGrids: 0,
         widthGrids: BALL_SIZE_GRIDS,
         heightGrids: BALL_SIZE_GRIDS,
-        type: ballType
+        type: ballType,
+        animationFrame: 0,
+        animationSequenceIndex: 0,
+        lastAnimationTime: 0
     };
     balls.push(ball);
 }
@@ -230,20 +236,13 @@ function moveTongue() {
 
 function drawBalls() {
     balls.forEach(ball => {
-        switch (ball.type) {
-            case 'clear':
-                ctx.fillStyle = 'yellow';
-                break;
-            case 'repair':
-                ctx.fillStyle = 'green';
-                break;
-            default: // 'normal'
-                ctx.fillStyle = 'blue';
-                break;
-        }
-        ctx.beginPath();
-        ctx.arc(gridToPx(ball.xGrids + ball.widthGrids / 2), gridToPx(ball.yGrids + ball.heightGrids / 2), gridToPx(ball.widthGrids / 2), 0, Math.PI * 2);
-        ctx.fill();
+        const sx = ball.animationFrame * 32; // 32 is the width of a single frame
+        const sy = 0;
+        const drawWidth = gridToPx(ball.widthGrids) * 1.5;
+        const drawHeight = gridToPx(ball.heightGrids) * 1.5;
+        const x = gridToPx(ball.xGrids) - (drawWidth - gridToPx(ball.widthGrids)) / 2;
+        const y = gridToPx(ball.yGrids) - (drawHeight - gridToPx(ball.heightGrids)) / 2;
+        ctx.drawImage(seedSprite, sx, sy, 32, 32, x, y, drawWidth, drawHeight);
     });
 }
 
@@ -254,7 +253,7 @@ function drawScore() {
     ctx.font = '20px "Courier New"'; // フォント変更
 
     const paddedScore = score.toString().padStart(6, '0');
-    const scoreText = `score ${paddedScore}`;
+    const scoreText = `${paddedScore}`;
 
     // テキストの幅を測定
     const textMetrics = ctx.measureText(scoreText);
@@ -301,10 +300,18 @@ function movePlayer() {
 
 
 
+const animationSequence = [0, 1, 0, 2];
+
 function moveBalls() {
     for (let i = balls.length - 1; i >= 0; i--) {
         const ball = balls[i];
         ball.yGrids += BALL_SPEED_GRIDS;
+
+        if (performance.now() - ball.lastAnimationTime > 300) { // 100ms interval for animation
+            ball.animationSequenceIndex = (ball.animationSequenceIndex + 1) % animationSequence.length;
+            ball.animationFrame = animationSequence[ball.animationSequenceIndex];
+            ball.lastAnimationTime = performance.now();
+        }
 
         if (ball.yGrids + ball.heightGrids >= GROUND_Y_GRIDS) {
             holes.push(Math.floor(ball.xGrids));
