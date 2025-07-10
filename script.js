@@ -242,7 +242,12 @@ function drawBalls() {
                 ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
                 break;
             case 'clear':
-                ctx.filter = 'hue-rotate(180deg)'; // Blueish
+                // Alternating brightness effect every 200ms
+                if (Math.floor(performance.now() / 200) % 2 === 0) {
+                    ctx.filter = 'hue-rotate(330deg) brightness(1.5)'; // Bright reddish
+                } else {
+                    ctx.filter = 'hue-rotate(330deg) brightness(0.7)'; // Dark reddish
+                }
                 break;
             default: // 'normal'
                 ctx.filter = 'none';
@@ -316,7 +321,7 @@ function movePlayer() {
 
 
 
-const animationSequence = [0, 1, 0, 2];
+const animationSequence = [0, 1, 1, 0, 2, 2];
 
 function moveBalls() {
     for (let i = balls.length - 1; i >= 0; i--) {
