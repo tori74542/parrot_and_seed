@@ -236,6 +236,19 @@ function moveTongue() {
 
 function drawBalls() {
     balls.forEach(ball => {
+        // Set filter based on ball type
+        switch (ball.type) {
+            case 'repair':
+                ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
+                break;
+            case 'clear':
+                ctx.filter = 'hue-rotate(180deg)'; // Blueish
+                break;
+            default: // 'normal'
+                ctx.filter = 'none';
+                break;
+        }
+
         const sx = ball.animationFrame * 32; // 32 is the width of a single frame
         const sy = 0;
         const drawWidth = gridToPx(ball.widthGrids) * 1.5;
@@ -243,6 +256,9 @@ function drawBalls() {
         const x = gridToPx(ball.xGrids) - (drawWidth - gridToPx(ball.widthGrids)) / 2;
         const y = gridToPx(ball.yGrids) - (drawHeight - gridToPx(ball.heightGrids)) / 2;
         ctx.drawImage(seedSprite, sx, sy, 32, 32, x, y, drawWidth, drawHeight);
+
+        // Reset filter to avoid affecting other drawings
+        ctx.filter = 'none';
     });
 }
 
