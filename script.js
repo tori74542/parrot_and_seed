@@ -71,6 +71,7 @@ const tongue = {
 };
 // Balls
 const balls = [];
+const caughtSeeds = [];
 // Holes
 const holes = []; // Stores x-grid positions of holes
 const fallingBlocks = []; // Stores blocks falling to repair holes
@@ -220,6 +221,8 @@ function moveTongue() {
         if (tongue.currentLength <= 0) {
             tongue.currentLength = 0;
             tongue.isRetracting = false;
+            // Clear caught seeds when tongue is fully retracted
+            caughtSeeds.length = 0;
         }
     }
 
@@ -232,6 +235,40 @@ function moveTongue() {
         tongue.tipXGrids = tongue.xGrids - tongue.currentLength * Math.cos(angle);
         tongue.tipYGrids = tongue.yGrids - tongue.currentLength * Math.sin(angle);
     }
+}
+
+function drawCaughtSeeds() {
+    caughtSeeds.forEach(seed => {
+        // Set filter based on seed type
+        switch (seed.type) {
+            case 'repair':
+                ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
+                break;
+            case 'clear':
+                // Alternating brightness effect every 200ms
+                if (Math.floor(performance.now() / 200) % 2 === 0) {
+                    ctx.filter = 'hue-rotate(330deg) brightness(1.5)'; // Bright reddish
+                } else {
+                    ctx.filter = 'hue-rotate(330deg) brightness(0.7)'; // Dark reddish
+                }
+                break;
+            default: // 'normal'
+                ctx.filter = 'none';
+                break;
+        }
+
+        const sx = seed.animationFrame * 32; // 32 is the width of a single frame
+        const sy = 0;
+        const drawWidth = gridToPx(seed.widthGrids) * 1.5;
+        const drawHeight = gridToPx(seed.heightGrids) * 1.5;
+        // Draw the seed at the tip of the tongue
+        const x = gridToPx(tongue.tipXGrids) - drawWidth / 2;
+        const y = gridToPx(tongue.tipYGrids) - drawHeight / 2;
+        ctx.drawImage(seedSprite, sx, sy, 32, 32, x, y, drawWidth, drawHeight);
+
+        // Reset filter
+        ctx.filter = 'none';
+    });
 }
 
 function drawBalls() {
@@ -447,7 +484,10 @@ function checkCollisions() {
                     score += 1;
                 }
 
-                balls.splice(i, 1);
+                // Move the ball to the caughtSeeds array instead of deleting it
+                const caughtSeed = balls.splice(i, 1)[0];
+                caughtSeeds.push(caughtSeed);
+
                 tongue.isExtending = false;
                 tongue.isRetracting = true;
             }
@@ -575,6 +615,7 @@ function update(currentTime) {
     drawGround();
     drawFallingBlocks();
     drawTongue();
+    drawCaughtSeeds();
     drawPlayer();
     drawBalls();
     drawScore();
