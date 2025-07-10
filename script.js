@@ -72,6 +72,7 @@ const tongue = {
 // Balls
 const balls = [];
 const caughtSeeds = [];
+const floatingScores = [];
 // Holes
 const holes = []; // Stores x-grid positions of holes
 const fallingBlocks = []; // Stores blocks falling to repair holes
@@ -307,6 +308,7 @@ function drawBalls() {
 // drawHoles() is now handled inside drawGround()
 
 function drawScore() {
+    ctx.globalAlpha = 1; // Ensure full opacity for main score
     ctx.fillStyle = 'black';
     ctx.font = '20px "Courier New"'; // フォント変更
 
@@ -322,6 +324,38 @@ function drawScore() {
     const displayY = 30; // Y座標は既存のものを流用
 
     ctx.fillText(scoreText, centerX, displayY);
+}
+
+function drawFloatingScores() {
+    const FADE_DURATION = 1000; // 1 second
+    const originalGlobalAlpha = ctx.globalAlpha; // Save original alpha
+    const originalTextAlign = ctx.textAlign; // Save original textAlign
+    const originalTextBaseline = ctx.textBaseline; // Save original textBaseline
+
+    for (let i = floatingScores.length - 1; i >= 0; i--) {
+        const fs = floatingScores[i];
+        const elapsedTime = performance.now() - fs.startTime;
+
+        if (elapsedTime > FADE_DURATION) {
+            floatingScores.splice(i, 1);
+            continue;
+        }
+
+        const alpha = 1 - (elapsedTime / FADE_DURATION); // Fade out
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = 'black';
+        ctx.font = 'bold 12px "Courier New"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Slightly move up as it fades
+        const offsetY = elapsedTime / FADE_DURATION * 20; // Move up 20px
+
+        ctx.fillText(fs.text, gridToPx(fs.x + BALL_SIZE_GRIDS / 2), gridToPx(fs.y + BALL_SIZE_GRIDS / 2) - offsetY);
+    }
+    ctx.globalAlpha = originalGlobalAlpha; // Restore original alpha
+    ctx.textAlign = originalTextAlign; // Restore original textAlign
+    ctx.textBaseline = originalTextBaseline; // Restore original textBaseline
 }
 
 function clear() {
@@ -378,6 +412,18 @@ function moveBalls() {
     }
 }
 
+function getPointsForHeight(yPos) {
+    if (yPos < 5) {
+        return 10;
+    } else if (yPos < 10) {
+        return 5;
+    } else if (yPos < 15) {
+        return 3;
+    } else {
+        return 1;
+    }
+}
+
 function checkCollisions() {
     // Tongue-Ball collision
     if (tongue.isExtending) {
@@ -393,18 +439,16 @@ function checkCollisions() {
                     const ballsToClearCount = balls.length;
                     let holesToRepairCount = ballsToClearCount - 1; // Don't count the clear ball itself
 
-                    // Add score for all balls on screen
+                    // Add score for all balls on screen and create floating scores
                     for (const b of balls) {
-                        const yPos = b.yGrids;
-                        if (yPos < 5) {
-                            score += 10;
-                        } else if (yPos < 10) {
-                            score += 5;
-                        } else if (yPos < 15) {
-                            score += 3;
-                        } else {
-                            score += 1;
-                        }
+                        const points = getPointsForHeight(b.yGrids);
+                        score += points;
+                        floatingScores.push({
+                            text: `+${points}`,
+                            x: b.xGrids,
+                            y: b.yGrids,
+                            startTime: performance.now()
+                        });
                     }
 
                     // --- Queue holes for repair for 'clear' ball ---
@@ -473,16 +517,14 @@ function checkCollisions() {
                 }
 
                 // Add score based on height, regardless of ball type
-                const yPos = ball.yGrids;
-                if (yPos < 5) {
-                    score += 10;
-                } else if (yPos < 10) {
-                    score += 5;
-                } else if (yPos < 15) {
-                    score += 3;
-                } else {
-                    score += 1;
-                }
+                const points = getPointsForHeight(ball.yGrids);
+                score += points;
+                floatingScores.push({
+                    text: `+${points}`,
+                    x: ball.xGrids,
+                    y: ball.yGrids,
+                    startTime: performance.now()
+                });
 
                 // Move the ball to the caughtSeeds array instead of deleting it
                 const caughtSeed = balls.splice(i, 1)[0];
@@ -618,6 +660,7 @@ function update(currentTime) {
     drawCaughtSeeds();
     drawPlayer();
     drawBalls();
+    drawFloatingScores();
     drawScore();
 
     processRepairQueue();
