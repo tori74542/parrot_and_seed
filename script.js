@@ -1,6 +1,9 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Debug
+const DEBUG_MODE = true; // Set to true to show collision boxes
+
 // Grid constants
 const GRID_SIZE = 15;
 const SCREEN_WIDTH_GRIDS = 30;
@@ -174,6 +177,13 @@ function drawPlayer() {
     const drawY = gridToPx(player.yGrids) - yOffset;
 
     ctx.drawImage(currentSprite, sx, sy, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, drawX, drawY, drawWidthPx, drawHeightPx);
+
+    // Draw collision box in debug mode
+    if (DEBUG_MODE) {
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(gridToPx(player.xGrids), gridToPx(player.yGrids), gridToPx(player.widthGrids), gridToPx(player.heightGrids));
+    }
 }
 
 function drawGround() {
@@ -201,6 +211,14 @@ function drawTongue() {
         ctx.moveTo(gridToPx(tongue.xGrids), gridToPx(tongue.yGrids));
         ctx.lineTo(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids));
         ctx.stroke();
+
+        // Draw tongue tip collision point in debug mode
+        if (DEBUG_MODE) {
+            ctx.fillStyle = 'purple';
+            ctx.beginPath();
+            ctx.arc(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids), gridToPx(TONGUE_WIDTH_GRIDS * 2), 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
 }
 
@@ -299,6 +317,13 @@ function drawBalls() {
         const x = gridToPx(ball.xGrids) - (drawWidth - gridToPx(ball.widthGrids)) / 2;
         const y = gridToPx(ball.yGrids) - (drawHeight - gridToPx(ball.heightGrids)) / 2;
         ctx.drawImage(seedSprite, sx, sy, 32, 32, x, y, drawWidth, drawHeight);
+
+        // Draw collision box in debug mode
+        if (DEBUG_MODE) {
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(gridToPx(ball.xGrids), gridToPx(ball.yGrids), gridToPx(ball.widthGrids), gridToPx(ball.heightGrids));
+        }
 
         // Reset filter to avoid affecting other drawings
         ctx.filter = 'none';
