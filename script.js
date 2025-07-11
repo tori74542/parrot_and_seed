@@ -44,7 +44,8 @@ const gameState = {
     gameSpeedMultiplier: 1,
     level: 1,
     gameOver: false,
-    lastAnimationTime: 0
+    lastAnimationTime: 0,
+    isTitleScreen: true
 };
 
 // Sound effects
@@ -101,6 +102,13 @@ const keys = {
 };
 
 function keyDown(e) {
+    // If on the title screen, any key press starts the game.
+    if (gameState.isTitleScreen) {
+        gameState.isTitleScreen = false;
+        ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
+        return;
+    }
+
     if (gameState.gameOver) return;
     const key = e.key.toLowerCase();
     if (key === 'arrowright' || key === 'right' || key === 'c') {
@@ -162,7 +170,8 @@ function spawnBall() {
     balls.push(ball);
 }
 
-let ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
+// Initialize as null. The interval will be started when the game begins.
+let ballSpawnerId = null;
 
 // --- Drawing ---
 function gridToPx(gridValue) {
@@ -336,20 +345,20 @@ function drawBalls() {
 function drawScore() {
     ctx.globalAlpha = 1; // Ensure full opacity for main score
     ctx.fillStyle = 'black';
-    ctx.font = '20px "Courier New"'; // フォント変更
+    ctx.font = '20px "Courier New"';
+    ctx.textAlign = 'center'; // Explicitly set alignment for centering
 
     const paddedScore = gameState.score.toString().padStart(6, '0');
     const scoreText = `${paddedScore}`;
 
-    // テキストの幅を測定
-    const textMetrics = ctx.measureText(scoreText);
-    const textWidth = textMetrics.width;
-
-    // 中央揃えのX座標を計算
-    const centerX = (canvas.width - textWidth) / 2;
-    const displayY = 30; // Y座標は既存のものを流用
+    // 中央のX座標を指定
+    const centerX = canvas.width / 2;
+    const displayY = 30;
 
     ctx.fillText(scoreText, centerX, displayY);
+
+    // Reset textAlign to avoid affecting other drawing functions
+    ctx.textAlign = 'left';
 }
 
 function drawLevel() {
@@ -360,8 +369,16 @@ function drawLevel() {
     ctx.textAlign = 'right';
     ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 20);
     ctx.fillText(`Speed: ${gameState.gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 40);
-    ctx.fillText(`Player: (${player.xGrids.toFixed(2)}, ${player.yGrids.toFixed(2)})`, canvas.width - 10, 60);
+    ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 60);
     ctx.textAlign = 'left'; // Reset to default
+}
+
+function drawTitleScreen() {
+    // This function is called only when gameState.isTitleScreen is true
+    ctx.fillStyle = 'black';
+    ctx.font = '40px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('parrot and seed', canvas.width / 2, canvas.height / 2);
 }
 
 function drawFloatingScores() {
@@ -667,6 +684,23 @@ function update(currentTime) {
         return;
     }
 
+    // --- Logic updates (only when game is active) ---
+    if (!gameState.isTitleScreen) {
+        updateGameLogic(currentTime);
+    }
+
+    // --- Drawing (always happens) ---
+    drawGame();
+
+    // Draw title screen overlay if active
+    if (gameState.isTitleScreen) {
+        drawTitleScreen();
+    }
+
+    animationFrameId = requestAnimationFrame(update);
+}
+
+function updateGameLogic(currentTime) {
     // Update game speed based on score
     const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 10); // Increase level every 10 points
     if (newLevel > gameState.level) {
@@ -707,10 +741,15 @@ function update(currentTime) {
         movePlayer();
         lastMoveTime = currentTime;
     }
+    processRepairQueue();
+    moveFallingBlocks(currentTime);
+    moveTongue();
+    moveBalls();
+    checkCollisions();
+}
 
-
+function drawGame() {
     clear();
-
     drawGround();
     drawFallingBlocks();
     drawTongue();
@@ -720,14 +759,6 @@ function update(currentTime) {
     drawFloatingScores();
     drawScore();
     drawLevel();
-
-    processRepairQueue();
-    moveFallingBlocks(currentTime);
-    moveTongue();
-    moveBalls();
-    checkCollisions();
-
-    animationFrameId = requestAnimationFrame(update);
 }
 
 update(0);
