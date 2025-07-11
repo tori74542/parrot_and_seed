@@ -2,7 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Debug
-const DEBUG_MODE = true; // Set to true to show collision boxes
+const DEBUG_MODE = false; // Set to true to show collision boxes
 
 // Grid constants
 const GRID_SIZE = 15;
@@ -37,6 +37,9 @@ const PLAYER_Y_OFFSET_GRIDS = 0.25; // プレイヤー描画時のY軸オフセ�
 const SEED_SPRITE_FRAME_WIDTH = 32;
 const SEED_SPRITE_FRAME_HEIGHT = 32;
 const SEED_DRAW_SCALE = 1.5;
+
+// Game Configuration (loaded from config.json)
+let scoreTiers = [];
 
 // Game state using a phase machine
 const gameState = {
@@ -379,7 +382,7 @@ function drawLevel() {
 function drawTitleScreen() {
     // This function is called only when gameState.isTitleScreen is true
     ctx.fillStyle = 'black';
-    ctx.font = '40px "Courier New"';
+    ctx.font = '20px "Courier New"';
     ctx.textAlign = 'center';
     ctx.fillText('parrot and seed', canvas.width / 2, canvas.height / 2);
 }
@@ -489,15 +492,13 @@ function moveBalls() {
 }
 
 function getPointsForHeight(yPos) {
-    if (yPos < 5) {
-        return 10;
-    } else if (yPos < 10) {
-        return 5;
-    } else if (yPos < 15) {
-        return 3;
-    } else {
-        return 1;
+    // Find the correct score tier based on the loaded configuration
+    for (const tier of scoreTiers) {
+        if (yPos < tier.heightThreshold) {
+            return tier.points;
+        }
     }
+    return 0; // Default score if no tier is matched
 }
 
 function findClosestHole(targetX, holeArray) {
@@ -518,7 +519,7 @@ function findClosestHole(targetX, holeArray) {
 
 function checkCollisions() {
     // Tongue-Ball collision
-    if (tongue.isExtending) {
+    if (tongue.isExtending && scoreTiers.length > 0) { // Ensure config is loaded
         for (let i = balls.length - 1; i >= 0; i--) {
             const ball = balls[i];
             
@@ -827,4 +828,25 @@ function drawGame() {
     drawLevel();
 }
 
-update(0);
+async function initGame() {
+    try {
+        const response = await fetch('config.json');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const configData = await response.json();
+        scoreTiers = configData.scoreTiers;
+
+        // Start the game loop only after config is loaded successfully
+        update(0);
+    } catch (error) {
+        console.error("Could not load game configuration:", error);
+        // Display a user-friendly error message on the canvas
+        ctx.fillStyle = 'red';
+        ctx.font = '16px "Courier New"';
+        ctx.textAlign = 'center';
+        ctx.fillText('Error: Could not load game config.', canvas.width / 2, canvas.height / 2);
+    }
+}
+
+initGame();

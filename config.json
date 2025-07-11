@@ -1,0 +1,8 @@
+{
+    "scoreTiers": [
+        { "heightThreshold": 5, "points": 10 },
+        { "heightThreshold": 10, "points": 5 },
+        { "heightThreshold": 15, "points": 3 },
+        { "heightThreshold": 999, "points": 1 }
+    ]
+}
