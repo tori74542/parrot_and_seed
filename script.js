@@ -16,10 +16,14 @@ const GROUND_Y_GRIDS = SCREEN_HEIGHT_GRIDS - 1;
 const CHAR_SIZE_GRIDS = 1;
 const CHAR_SPEED_GRIDS = 0.5;
 const TONGUE_WIDTH_GRIDS = 0.2;
+const TONGUE_TIP_COLLISION_RADIUS_GRIDS = 0.6; // Adjust this value to make collision easier
 const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
-const BALL_SPEED_GRIDS = 0.05;
+const INITIAL_BALL_SPEED_GRIDS = 0.05;
+const MIN_BALL_SPEED_GRIDS = 0.03;
+const MAX_BALL_SPEED_GRIDS = 0.07;
 const BALL_SPAWN_INTERVAL = 2000; // ms
+const INITIAL_LEVEL = 1; // For debugging, set initial game level
 
 // Animation constants
 const PLAYER_SPRITE_WIDTH = 128;
@@ -30,6 +34,8 @@ const PLAYER_DRAW_SCALE = 1.5;
 
 // Game state
 let score = 0;
+let gameSpeedMultiplier = 1;
+let level = 1;
 let gameOver = false;
 let animationFrameId;
 let lastAnimationTime = 0;
@@ -143,12 +149,13 @@ function spawnBall() {
         type: ballType,
         animationFrame: 0,
         animationSequenceIndex: 0,
-        lastAnimationTime: 0
+        lastAnimationTime: 0,
+        speed: MIN_BALL_SPEED_GRIDS + Math.random() * (MAX_BALL_SPEED_GRIDS - MIN_BALL_SPEED_GRIDS)
     };
     balls.push(ball);
 }
 
-const ballSpawner = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
+let ballSpawner = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
 
 // --- Drawing ---
 function gridToPx(gridValue) {
@@ -228,7 +235,7 @@ function moveTongue() {
     tongue.yGrids = player.yGrids + player.heightGrids / 2;
 
     if (tongue.isExtending) {
-        tongue.currentLength += tongue.speed;
+        tongue.currentLength += tongue.speed * gameSpeedMultiplier;
 
         // Check if tongue tip hits screen boundaries
         if (tongue.tipXGrids < 0 || tongue.tipXGrids > SCREEN_WIDTH_GRIDS || tongue.tipYGrids < 0) {
@@ -351,6 +358,17 @@ function drawScore() {
     ctx.fillText(scoreText, centerX, displayY);
 }
 
+function drawLevel() {
+    if (!DEBUG_MODE) return;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'black';
+    ctx.font = '16px "Courier New"';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Level: ${level}`, canvas.width - 10, 20);
+    ctx.fillText(`Speed: ${gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 40); // Display gameSpeedMultiplier
+    ctx.textAlign = 'left'; // Reset to default
+}
+
 function drawFloatingScores() {
     const FADE_DURATION = 1000; // 1 second
     const originalGlobalAlpha = ctx.globalAlpha; // Save original alpha
@@ -422,7 +440,7 @@ const animationSequence = [0, 1, 1, 0, 2, 2];
 function moveBalls() {
     for (let i = balls.length - 1; i >= 0; i--) {
         const ball = balls[i];
-        ball.yGrids += BALL_SPEED_GRIDS;
+        ball.yGrids += ball.speed * gameSpeedMultiplier;
 
         if (performance.now() - ball.lastAnimationTime > 300) { // 100ms interval for animation
             ball.animationSequenceIndex = (ball.animationSequenceIndex + 1) % animationSequence.length;
@@ -454,10 +472,15 @@ function checkCollisions() {
     if (tongue.isExtending) {
         for (let i = balls.length - 1; i >= 0; i--) {
             const ball = balls[i];
-            const tongueTipX = tongue.direction === 1 ? tongue.xGrids + tongue.widthGrids : tongue.xGrids;
+            
+            // Calculate distance between tongue tip and ball center
+            const ballCenterX = ball.xGrids + ball.widthGrids / 2;
+            const ballCenterY = ball.yGrids + ball.heightGrids / 2;
+            const distance = Math.sqrt(Math.pow(tongue.tipXGrids - ballCenterX, 2) + Math.pow(tongue.tipYGrids - ballCenterY, 2));
 
-            if (tongue.tipXGrids > ball.xGrids && tongue.tipXGrids < ball.xGrids + ball.widthGrids &&
-                tongue.tipYGrids > ball.yGrids && tongue.tipYGrids < ball.yGrids + ball.heightGrids) {
+            // Check for collision using distance and combined radii (ball is square, so use half diagonal as radius approximation)
+            const ballRadiusApprox = Math.sqrt(Math.pow(ball.widthGrids / 2, 2) + Math.pow(ball.heightGrids / 2, 2));
+            if (distance < TONGUE_TIP_COLLISION_RADIUS_GRIDS + ballRadiusApprox) {
 
                 // Check if the hit ball is a 'clear' ball
                 if (ball.type === 'clear') {
@@ -646,13 +669,23 @@ const MOVE_INTERVAL = 50; // ms, adjust for desired speed
 function update(currentTime) {
     if (gameOver) return;
 
+    // Update game speed based on score
+    const newLevel = INITIAL_LEVEL + Math.floor(score / 10); // Increase level every 10 points
+    if (newLevel > level) {
+        level = newLevel;
+        gameSpeedMultiplier = 1 + (level - 1) * 0.1; // Increase speed by 10% per level
+        // Adjust ball spawn interval
+        clearInterval(ballSpawner);
+        ballSpawner = setInterval(spawnBall, BALL_SPAWN_INTERVAL / gameSpeedMultiplier);
+    }
+
     // Allow movement only when tongue is not active
     if (!tongue.isExtending && !tongue.isRetracting) {
         if (keys.right) {
-            player.dxGrids = CHAR_SPEED_GRIDS;
+            player.dxGrids = CHAR_SPEED_GRIDS * gameSpeedMultiplier;
             player.direction = 1;
         } else if (keys.left) {
-            player.dxGrids = -CHAR_SPEED_GRIDS;
+            player.dxGrids = -CHAR_SPEED_GRIDS * gameSpeedMultiplier;
             player.direction = -1;
         } else {
             player.dxGrids = 0;
@@ -687,6 +720,7 @@ function update(currentTime) {
     drawBalls();
     drawFloatingScores();
     drawScore();
+    drawLevel();
 
     processRepairQueue();
     moveFallingBlocks(currentTime);
