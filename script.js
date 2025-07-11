@@ -38,14 +38,13 @@ const SEED_SPRITE_FRAME_WIDTH = 32;
 const SEED_SPRITE_FRAME_HEIGHT = 32;
 const SEED_DRAW_SCALE = 1.5;
 
-// Game state
+// Game state using a phase machine
 const gameState = {
     score: 0,
     gameSpeedMultiplier: 1,
     level: 1,
-    gameOver: false,
-    lastAnimationTime: 0,
-    isTitleScreen: true
+    phase: 'title', // 'title', 'playing', 'dying', 'gameOver'
+    lastAnimationTime: 0
 };
 
 // Sound effects
@@ -102,37 +101,42 @@ const keys = {
 };
 
 function keyDown(e) {
-    // If on the title screen, any key press starts the game.
-    if (gameState.isTitleScreen) {
-        gameState.isTitleScreen = false;
-        ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
-        return;
-    }
-
-    if (gameState.gameOver) return;
-    const key = e.key.toLowerCase();
-    if (key === 'arrowright' || key === 'right' || key === 'c') {
-        keys.right = true;
-    } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
-        keys.left = true;
-    } else if (e.key === 'Enter') {
+    switch (gameState.phase) {
+        case 'title':
+            gameState.phase = 'playing';
+            // Start spawning balls only when the game starts
+            ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
+            break;
+        case 'gameOver':
+            resetGame();
+            break;
+        case 'playing':
+            const key = e.key.toLowerCase();
+            if (key === 'arrowright' || key === 'right' || key === 'c') {
+                keys.right = true;
+            } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
+                keys.left = true;
+            } else if (e.key === 'Enter') {
+                // Allow tongue action only when not extending/retracting
             if (!tongue.isExtending && !tongue.isRetracting) {
                 tongue.isExtending = true;
                 tongue.direction = player.direction;
-                // 効果音再生
-                tongueSound.currentTime = 0; // 再生位置を先頭に戻す
+                    tongueSound.currentTime = 0;
                 tongueSound.play();
             }
-        }
+            }
+            break;
+    }
 }
 
 function keyUp(e) {
+    if (gameState.phase !== 'playing') return; // Only handle keyUp during gameplay
     const key = e.key.toLowerCase();
     if (key === 'arrowright' || key === 'right' || key === 'c') {
         keys.right = false;
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         keys.left = false;
-    } else if (key === 'enter') {
+    } else if (e.key === 'enter') {
         if (tongue.isExtending) {
             tongue.isExtending = false;
             tongue.isRetracting = true;
@@ -146,7 +150,6 @@ document.addEventListener('keyup', keyUp);
 
 
 function spawnBall() {
-    if (gameState.gameOver) return;
     const rand = Math.random();
     let ballType;
     if (rand < 0.05) { // 5% chance for a clear ball
@@ -379,6 +382,20 @@ function drawTitleScreen() {
     ctx.font = '40px "Courier New"';
     ctx.textAlign = 'center';
     ctx.fillText('parrot and seed', canvas.width / 2, canvas.height / 2);
+}
+
+function drawGameOverScreen() {
+    // This function is called only when gameState.phase is 'gameOver'
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'white';
+    ctx.font = '40px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
+
+    ctx.font = '20px "Courier New"';
+    ctx.fillText('Press any key to restart', canvas.width / 2, canvas.height / 2 + 20);
 }
 
 function drawFloatingScores() {
@@ -668,10 +685,56 @@ function processRepairQueue() {
 }
 
 function endGame() {
-    gameState.gameOver = true;
+    gameState.phase = 'dying';
     clearInterval(ballSpawnerId);
-    // cancelAnimationFrame is handled in the game loop
-    alert(`Game Over! Your score: ${gameState.score}`);
+    ballSpawnerId = null; // Ensure it's cleared
+}
+
+const PLAYER_DEATH_SPEED = 0.033; // Grids per frame. Slower speed for a longer animation.
+
+function updateDyingAnimation() {
+    // Move player down through the floor
+    player.yGrids += PLAYER_DEATH_SPEED;
+
+    // Once the player is off-screen, transition to the game over screen
+    if (player.yGrids > SCREEN_HEIGHT_GRIDS) {
+        gameState.phase = 'gameOver';
+    }
+}
+
+function resetGame() {
+    // Reset game state
+    gameState.score = 0;
+    gameState.gameSpeedMultiplier = 1;
+    gameState.level = INITIAL_LEVEL;
+    gameState.phase = 'title';
+    gameState.lastAnimationTime = 0;
+
+    // Reset player
+    player.xGrids = SCREEN_WIDTH_GRIDS / 2 - CHAR_SIZE_GRIDS / 2;
+    player.yGrids = GROUND_Y_GRIDS - CHAR_SIZE_GRIDS;
+    player.dxGrids = 0;
+    player.direction = 1;
+    player.currentFrame = 0;
+
+    // Reset tongue
+    tongue.currentLength = 0;
+    tongue.isExtending = false;
+    tongue.isRetracting = false;
+
+    // Clear all dynamic arrays
+    balls.length = 0;
+    caughtSeeds.length = 0;
+    floatingScores.length = 0;
+    holes.length = 0;
+    fallingBlocks.length = 0;
+    repairQueue.length = 0;
+
+    // Clear intervals (though it should already be cleared by endGame)
+    if (ballSpawnerId) {
+        clearInterval(ballSpawnerId);
+        ballSpawnerId = null;
+    }
 }
 
 let lastMoveTime = 0;
@@ -679,22 +742,25 @@ const MOVE_INTERVAL = 50; // ms, adjust for desired speed
 let animationFrameId;
 
 function update(currentTime) {
-    if (gameState.gameOver) {
-        cancelAnimationFrame(animationFrameId);
-        return;
-    }
-
-    // --- Logic updates (only when game is active) ---
-    if (!gameState.isTitleScreen) {
-        updateGameLogic(currentTime);
+    // --- Logic updates based on phase ---
+    switch (gameState.phase) {
+        case 'playing':
+            updateGameLogic(currentTime);
+            break;
+        case 'dying':
+            updateDyingAnimation();
+            break;
+        // 'title' and 'gameOver' phases don't have logic updates
     }
 
     // --- Drawing (always happens) ---
     drawGame();
 
-    // Draw title screen overlay if active
-    if (gameState.isTitleScreen) {
+    // --- Draw overlays based on phase ---
+    if (gameState.phase === 'title') {
         drawTitleScreen();
+    } else if (gameState.phase === 'gameOver') {
+        drawGameOverScreen();
     }
 
     animationFrameId = requestAnimationFrame(update);
