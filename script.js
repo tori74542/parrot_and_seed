@@ -680,10 +680,10 @@ function update(currentTime) {
     // Allow movement only when tongue is not active
     if (!tongue.isExtending && !tongue.isRetracting) {
         if (keys.right) {
-            player.dxGrids = CHAR_SPEED_GRIDS * gameState.gameSpeedMultiplier;
+            player.dxGrids = CHAR_SPEED_GRIDS;
             player.direction = 1;
         } else if (keys.left) {
-            player.dxGrids = -CHAR_SPEED_GRIDS * gameState.gameSpeedMultiplier;
+            player.dxGrids = -CHAR_SPEED_GRIDS;
             player.direction = -1;
         } else {
             player.dxGrids = 0;
@@ -702,7 +702,8 @@ function update(currentTime) {
         player.currentFrame = 0; // Reset to first frame when not moving
     }
     
-    if (currentTime - lastMoveTime > MOVE_INTERVAL) {
+    const currentMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
+    if (currentTime - lastMoveTime > currentMoveInterval) {
         movePlayer();
         lastMoveTime = currentTime;
     }
