@@ -2,7 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Debug
-const DEBUG_MODE = false; // Set to true to show collision boxes
+const DEBUG_MODE = true; // Set to true to show collision boxes
 
 // Grid constants
 const GRID_SIZE = 15;
@@ -370,7 +370,7 @@ function drawScore() {
 function drawLevel() {
     if (!DEBUG_MODE) return;
     ctx.globalAlpha = 1;
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = 'rgba(0, 150, 255, 0.8)'; // Light blue for debug text
     ctx.font = '16px "Courier New"';
     ctx.textAlign = 'right';
     ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 20);
@@ -431,6 +431,33 @@ function drawFloatingScores() {
     ctx.globalAlpha = originalGlobalAlpha; // Restore original alpha
     ctx.textAlign = originalTextAlign; // Restore original textAlign
     ctx.textBaseline = originalTextBaseline; // Restore original textBaseline
+}
+
+function drawScoreTiers() {
+    if (!DEBUG_MODE || scoreTiers.length === 0) {
+        return;
+    }
+
+    ctx.save(); // Save the current drawing state
+
+    ctx.setLineDash([5, 3]); // Set to a dashed line
+    ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)'; // Light blue, semi-transparent
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 12px "Courier New"';
+    ctx.fillStyle = 'rgba(0, 150, 255, 0.7)'; // Light blue, semi-transparent
+    ctx.textAlign = 'left';
+
+    for (const tier of scoreTiers) {
+        const y = gridToPx(tier.heightThreshold);
+
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+        ctx.fillText(`${tier.points} pts`, 5, y - 4);
+    }
+
+    ctx.restore(); // Restore to the original drawing state
 }
 
 function clear() {
@@ -769,7 +796,7 @@ function update(currentTime) {
 
 function updateGameLogic(currentTime) {
     // Update game speed based on score
-    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 10); // Increase level every 10 points
+    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 1000); // Increase level every 10 points
     if (newLevel > gameState.level) {
         gameState.level = newLevel;
         gameState.gameSpeedMultiplier = 1 + (gameState.level - 1) * 0.1; // Increase speed by 10% per level
@@ -818,6 +845,7 @@ function updateGameLogic(currentTime) {
 function drawGame() {
     clear();
     drawGround();
+    drawScoreTiers();
     drawFallingBlocks();
     drawTongue();
     drawCaughtSeeds();
