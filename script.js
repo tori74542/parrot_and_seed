@@ -31,14 +31,21 @@ const PLAYER_SPRITE_HEIGHT = 128;
 const PLAYER_WALK_FRAMES = 10;
 const PLAYER_ANIMATION_SPEED = 100; // ms per frame
 const PLAYER_DRAW_SCALE = 1.5;
+const PLAYER_Y_OFFSET_GRIDS = 0.25; // プレイヤー描画時のY軸オフセット
+
+// Seed sprite constants
+const SEED_SPRITE_FRAME_WIDTH = 32;
+const SEED_SPRITE_FRAME_HEIGHT = 32;
+const SEED_DRAW_SCALE = 1.5;
 
 // Game state
-let score = 0;
-let gameSpeedMultiplier = 1;
-let level = 1;
-let gameOver = false;
-let animationFrameId;
-let lastAnimationTime = 0;
+const gameState = {
+    score: 0,
+    gameSpeedMultiplier: 1,
+    level: 1,
+    gameOver: false,
+    lastAnimationTime: 0
+};
 
 // Sound effects
 const tongueSound = new Audio('tongue.mp3');
@@ -94,7 +101,7 @@ const keys = {
 };
 
 function keyDown(e) {
-    if (gameOver) return;
+    if (gameState.gameOver) return;
     const key = e.key.toLowerCase();
     if (key === 'arrowright' || key === 'right' || key === 'c') {
         keys.right = true;
@@ -131,7 +138,7 @@ document.addEventListener('keyup', keyUp);
 
 
 function spawnBall() {
-    if (gameOver) return;
+    if (gameState.gameOver) return;
     const rand = Math.random();
     let ballType;
     if (rand < 0.05) { // 5% chance for a clear ball
@@ -155,7 +162,7 @@ function spawnBall() {
     balls.push(ball);
 }
 
-let ballSpawner = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
+let ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
 
 // --- Drawing ---
 function gridToPx(gridValue) {
@@ -181,7 +188,7 @@ function drawPlayer() {
     const xOffset = (drawWidthPx - baseWidthPx) / 2;
     const yOffset = (drawHeightPx - baseHeightPx) / 2;
     const drawX = gridToPx(player.xGrids) - xOffset;
-    const drawY = gridToPx(player.yGrids) - yOffset - gridToPx(0.25); // 0.25グリッド分上にずらす
+    const drawY = gridToPx(player.yGrids) - yOffset - gridToPx(PLAYER_Y_OFFSET_GRIDS);
 
     ctx.drawImage(currentSprite, sx, sy, PLAYER_SPRITE_WIDTH, PLAYER_SPRITE_HEIGHT, drawX, drawY, drawWidthPx, drawHeightPx);
 
@@ -235,7 +242,7 @@ function moveTongue() {
     tongue.yGrids = player.yGrids + player.heightGrids / 2;
 
     if (tongue.isExtending) {
-        tongue.currentLength += tongue.speed * gameSpeedMultiplier;
+        tongue.currentLength += tongue.speed * gameState.gameSpeedMultiplier;
 
         // Check if tongue tip hits screen boundaries
         if (tongue.tipXGrids < 0 || tongue.tipXGrids > SCREEN_WIDTH_GRIDS || tongue.tipYGrids < 0) {
@@ -263,34 +270,37 @@ function moveTongue() {
     }
 }
 
+function applyItemStyle(ctx, itemType) {
+    switch (itemType) {
+        case 'repair':
+            ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
+            break;
+        case 'clear':
+            // Alternating brightness effect every 200ms
+            if (Math.floor(performance.now() / 200) % 2 === 0) {
+                ctx.filter = 'hue-rotate(330deg) brightness(1.5)'; // Bright reddish
+            } else {
+                ctx.filter = 'hue-rotate(330deg) brightness(0.7)'; // Dark reddish
+            }
+            break;
+        default: // 'normal'
+            ctx.filter = 'none';
+            break;
+    }
+}
+
 function drawCaughtSeeds() {
     caughtSeeds.forEach(seed => {
-        // Set filter based on seed type
-        switch (seed.type) {
-            case 'repair':
-                ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
-                break;
-            case 'clear':
-                // Alternating brightness effect every 200ms
-                if (Math.floor(performance.now() / 200) % 2 === 0) {
-                    ctx.filter = 'hue-rotate(330deg) brightness(1.5)'; // Bright reddish
-                } else {
-                    ctx.filter = 'hue-rotate(330deg) brightness(0.7)'; // Dark reddish
-                }
-                break;
-            default: // 'normal'
-                ctx.filter = 'none';
-                break;
-        }
+        applyItemStyle(ctx, seed.type);
 
-        const sx = seed.animationFrame * 32; // 32 is the width of a single frame
+        const sx = seed.animationFrame * SEED_SPRITE_FRAME_WIDTH;
         const sy = 0;
-        const drawWidth = gridToPx(seed.widthGrids) * 1.5;
-        const drawHeight = gridToPx(seed.heightGrids) * 1.5;
+        const drawWidth = gridToPx(seed.widthGrids) * SEED_DRAW_SCALE;
+        const drawHeight = gridToPx(seed.heightGrids) * SEED_DRAW_SCALE;
         // Draw the seed at the tip of the tongue
         const x = gridToPx(tongue.tipXGrids) - drawWidth / 2;
         const y = gridToPx(tongue.tipYGrids) - drawHeight / 2;
-        ctx.drawImage(seedSprite, sx, sy, 32, 32, x, y, drawWidth, drawHeight);
+        ctx.drawImage(seedSprite, sx, sy, SEED_SPRITE_FRAME_WIDTH, SEED_SPRITE_FRAME_HEIGHT, x, y, drawWidth, drawHeight);
 
         // Reset filter
         ctx.filter = 'none';
@@ -299,31 +309,15 @@ function drawCaughtSeeds() {
 
 function drawBalls() {
     balls.forEach(ball => {
-        // Set filter based on ball type
-        switch (ball.type) {
-            case 'repair':
-                ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
-                break;
-            case 'clear':
-                // Alternating brightness effect every 200ms
-                if (Math.floor(performance.now() / 200) % 2 === 0) {
-                    ctx.filter = 'hue-rotate(330deg) brightness(1.5)'; // Bright reddish
-                } else {
-                    ctx.filter = 'hue-rotate(330deg) brightness(0.7)'; // Dark reddish
-                }
-                break;
-            default: // 'normal'
-                ctx.filter = 'none';
-                break;
-        }
+        applyItemStyle(ctx, ball.type);
 
-        const sx = ball.animationFrame * 32; // 32 is the width of a single frame
+        const sx = ball.animationFrame * SEED_SPRITE_FRAME_WIDTH;
         const sy = 0;
-        const drawWidth = gridToPx(ball.widthGrids) * 1.5;
-        const drawHeight = gridToPx(ball.heightGrids) * 1.5;
+        const drawWidth = gridToPx(ball.widthGrids) * SEED_DRAW_SCALE;
+        const drawHeight = gridToPx(ball.heightGrids) * SEED_DRAW_SCALE;
         const x = gridToPx(ball.xGrids) - (drawWidth - gridToPx(ball.widthGrids)) / 2;
         const y = gridToPx(ball.yGrids) - (drawHeight - gridToPx(ball.heightGrids)) / 2;
-        ctx.drawImage(seedSprite, sx, sy, 32, 32, x, y, drawWidth, drawHeight);
+        ctx.drawImage(seedSprite, sx, sy, SEED_SPRITE_FRAME_WIDTH, SEED_SPRITE_FRAME_HEIGHT, x, y, drawWidth, drawHeight);
 
         // Draw collision box in debug mode
         if (DEBUG_MODE) {
@@ -344,7 +338,7 @@ function drawScore() {
     ctx.fillStyle = 'black';
     ctx.font = '20px "Courier New"'; // フォント変更
 
-    const paddedScore = score.toString().padStart(6, '0');
+    const paddedScore = gameState.score.toString().padStart(6, '0');
     const scoreText = `${paddedScore}`;
 
     // テキストの幅を測定
@@ -364,8 +358,9 @@ function drawLevel() {
     ctx.fillStyle = 'black';
     ctx.font = '16px "Courier New"';
     ctx.textAlign = 'right';
-    ctx.fillText(`Level: ${level}`, canvas.width - 10, 20);
-    ctx.fillText(`Speed: ${gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 40); // Display gameSpeedMultiplier
+    ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 20);
+    ctx.fillText(`Speed: ${gameState.gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 40);
+    ctx.fillText(`Player: (${player.xGrids.toFixed(2)}, ${player.yGrids.toFixed(2)})`, canvas.width - 10, 60);
     ctx.textAlign = 'left'; // Reset to default
 }
 
@@ -440,7 +435,7 @@ const animationSequence = [0, 1, 1, 0, 2, 2];
 function moveBalls() {
     for (let i = balls.length - 1; i >= 0; i--) {
         const ball = balls[i];
-        ball.yGrids += ball.speed * gameSpeedMultiplier;
+        ball.yGrids += ball.speed * gameState.gameSpeedMultiplier;
 
         if (performance.now() - ball.lastAnimationTime > 300) { // 100ms interval for animation
             ball.animationSequenceIndex = (ball.animationSequenceIndex + 1) % animationSequence.length;
@@ -449,7 +444,11 @@ function moveBalls() {
         }
 
         if (ball.yGrids + ball.heightGrids >= GROUND_Y_GRIDS) {
-            holes.push(Math.floor(ball.xGrids));
+            const holeX = Math.floor(ball.xGrids);
+            // Prevent duplicate holes at the same grid location
+            if (!holes.includes(holeX)) {
+                holes.push(holeX);
+            }
             balls.splice(i, 1);
         }
     }
@@ -465,6 +464,22 @@ function getPointsForHeight(yPos) {
     } else {
         return 1;
     }
+}
+
+function findClosestHole(targetX, holeArray) {
+    if (holeArray.length === 0) return null;
+
+    let closestHoleX = null;
+    let minDistance = Infinity;
+
+    for (const holeX of holeArray) {
+        const distance = Math.abs(targetX - holeX);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestHoleX = holeX;
+        }
+    }
+    return closestHoleX;
 }
 
 function checkCollisions() {
@@ -490,7 +505,7 @@ function checkCollisions() {
                     // Add score for all balls on screen and create floating scores
                     for (const b of balls) {
                         const points = getPointsForHeight(b.yGrids);
-                        score += points;
+                        gameState.score += points;
                         floatingScores.push({
                             text: `+${points}`,
                             x: b.xGrids,
@@ -504,22 +519,11 @@ function checkCollisions() {
                     const holesToQueue = [];
 
                     while (holesToRepairCount > 0 && tempHoles.length > 0) {
-                        let closestHoleIndex = -1;
-                        let minDistance = Infinity;
                         const playerCenterX = player.xGrids + player.widthGrids / 2;
-
-                        for (let j = 0; j < tempHoles.length; j++) {
-                            const holeX = tempHoles[j];
-                            const distance = Math.abs(playerCenterX - holeX);
-                            if (distance < minDistance) {
-                                minDistance = distance;
-                                closestHoleIndex = j;
-                            }
-                        }
-
-                        if (closestHoleIndex !== -1) {
-                            holesToQueue.push(tempHoles[closestHoleIndex]);
-                            tempHoles.splice(closestHoleIndex, 1);
+                        const closestHoleX = findClosestHole(playerCenterX, tempHoles);
+                        if (closestHoleX !== null) {
+                            holesToQueue.push(closestHoleX);
+                            tempHoles.splice(tempHoles.indexOf(closestHoleX), 1);
                         }
                         holesToRepairCount--;
                     }
@@ -543,30 +547,20 @@ function checkCollisions() {
                 // --- Logic for 'normal' and 'repair' balls ---
                 if (ball.type === 'repair') {
                     if (holes.length > 0) {
-                        let closestHoleIndex = -1;
-                        let minDistance = Infinity;
                         const playerCenterX = player.xGrids + player.widthGrids / 2;
-
-                        for (let j = 0; j < holes.length; j++) {
-                            const holeX = holes[j];
-                            const distance = Math.abs(playerCenterX - holeX);
-                            if (distance < minDistance) {
-                                minDistance = distance;
-                                closestHoleIndex = j;
-                            }
-                        }
-
-                        if (closestHoleIndex !== -1) {
-                            const holeToRepairX = holes[closestHoleIndex];
-                            // Queue the hole for repair
-                            repairQueue.push(holeToRepairX);
+                        const holeToRepairX = findClosestHole(playerCenterX, holes);
+                        if (holeToRepairX !== null) {
+                           // Queue the hole for repair, but only if it's not already queued
+                           if (!repairQueue.includes(holeToRepairX)) {
+                                repairQueue.push(holeToRepairX);
+                           }
                         }
                     }
                 }
 
                 // Add score based on height, regardless of ball type
                 const points = getPointsForHeight(ball.yGrids);
-                score += points;
+                gameState.score += points;
                 floatingScores.push({
                     text: `+${points}`,
                     x: ball.xGrids,
@@ -657,35 +651,39 @@ function processRepairQueue() {
 }
 
 function endGame() {
-    gameOver = true;
-    clearInterval(ballSpawner);
-    cancelAnimationFrame(animationFrameId);
-    alert(`Game Over! Your score: ${score}`);
+    gameState.gameOver = true;
+    clearInterval(ballSpawnerId);
+    // cancelAnimationFrame is handled in the game loop
+    alert(`Game Over! Your score: ${gameState.score}`);
 }
 
 let lastMoveTime = 0;
 const MOVE_INTERVAL = 50; // ms, adjust for desired speed
+let animationFrameId;
 
 function update(currentTime) {
-    if (gameOver) return;
+    if (gameState.gameOver) {
+        cancelAnimationFrame(animationFrameId);
+        return;
+    }
 
     // Update game speed based on score
-    const newLevel = INITIAL_LEVEL + Math.floor(score / 10); // Increase level every 10 points
-    if (newLevel > level) {
-        level = newLevel;
-        gameSpeedMultiplier = 1 + (level - 1) * 0.1; // Increase speed by 10% per level
+    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 10); // Increase level every 10 points
+    if (newLevel > gameState.level) {
+        gameState.level = newLevel;
+        gameState.gameSpeedMultiplier = 1 + (gameState.level - 1) * 0.1; // Increase speed by 10% per level
         // Adjust ball spawn interval
-        clearInterval(ballSpawner);
-        ballSpawner = setInterval(spawnBall, BALL_SPAWN_INTERVAL / gameSpeedMultiplier);
+        clearInterval(ballSpawnerId);
+        ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL / gameState.gameSpeedMultiplier);
     }
 
     // Allow movement only when tongue is not active
     if (!tongue.isExtending && !tongue.isRetracting) {
         if (keys.right) {
-            player.dxGrids = CHAR_SPEED_GRIDS * gameSpeedMultiplier;
+            player.dxGrids = CHAR_SPEED_GRIDS * gameState.gameSpeedMultiplier;
             player.direction = 1;
         } else if (keys.left) {
-            player.dxGrids = -CHAR_SPEED_GRIDS * gameSpeedMultiplier;
+            player.dxGrids = -CHAR_SPEED_GRIDS * gameState.gameSpeedMultiplier;
             player.direction = -1;
         } else {
             player.dxGrids = 0;
@@ -696,9 +694,9 @@ function update(currentTime) {
 
     // Update animation frame only if moving
     if (player.dxGrids !== 0) {
-        if (currentTime - lastAnimationTime > PLAYER_ANIMATION_SPEED) {
+        if (currentTime - gameState.lastAnimationTime > PLAYER_ANIMATION_SPEED) {
             player.currentFrame = (player.currentFrame + 1) % PLAYER_WALK_FRAMES;
-            lastAnimationTime = currentTime;
+            gameState.lastAnimationTime = currentTime;
         }
     } else {
         player.currentFrame = 0; // Reset to first frame when not moving
