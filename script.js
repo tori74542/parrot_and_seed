@@ -1,4 +1,5 @@
 import { generateNormalRandom } from './utils.js';
+import { difficultyTiers, BALL_SPAWN_INTERVAL, MIN_BALL_SPAWN_INTERVAL } from './difficulty.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -23,7 +24,6 @@ const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
 const MIN_BALL_SPEED_GRIDS = 0.03;
 const MAX_BALL_SPEED_GRIDS = 0.07;
-const BALL_SPAWN_INTERVAL = 2000; // ms
 const INITIAL_LEVEL = 1; // For debugging, set initial game level
 
 // Animation constants
@@ -377,18 +377,29 @@ function drawScore() {
     ctx.textAlign = 'left';
 }
 
-function drawLevel(currentTime) {
+function drawDebugInfo(currentTime) {
     if (!DEBUG_MODE) return;
     ctx.globalAlpha = 1;
     ctx.fillStyle = 'rgba(255, 0, 0, 0.8)'; // Red for debug text
     ctx.font = '12px "Courier New"';
     ctx.textAlign = 'right';
-    const elapsedSinceSpawn = currentTime - gameState.lastSpawnTime;
+
+    // Only update the spawn timer during the 'playing' phase to prevent it from
+    // running on the title or game over screens.
+    let elapsedSinceSpawn = 0;
+    if (gameState.phase === 'playing') {
+        elapsedSinceSpawn = currentTime - gameState.lastSpawnTime;
+    }
+    const playerMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
+    const minSeedSpeed = MIN_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
+    const maxSeedSpeed = MAX_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
+
     ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 15);
-    ctx.fillText(`Speed: ${gameState.gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 29);
-    ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 43);
+    ctx.fillText(`Player Interval: ${playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
+    ctx.fillText(`Seed Spd Range: ${minSeedSpeed.toFixed(3)}-${maxSeedSpeed.toFixed(3)}`, canvas.width - 10, 43);
+    ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
     const spawnTimerText = `Spawn: ${elapsedSinceSpawn.toFixed(0)} / ${gameState.ballSpawnInterval.toFixed(0)}`;
-    ctx.fillText(spawnTimerText, canvas.width - 10, 57);
+    ctx.fillText(spawnTimerText, canvas.width - 10, 71);
     ctx.textAlign = 'left'; // Reset to default
 }
 
@@ -808,11 +819,29 @@ function updateGameLogic(currentTime) {
     }
 
     // Update game speed based on score
-    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 1000); // Increase level every 1000 points
+    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 1000);
     if (newLevel > gameState.level) {
-        gameState.level = newLevel;
-        gameState.gameSpeedMultiplier = 1 + (gameState.level - 1) * 0.1; // Increase speed by 10% per level
-        gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL / gameState.gameSpeedMultiplier;
+        // If multiple levels are gained at once, iterate through each level-up.
+        for (let levelToProcess = gameState.level + 1; levelToProcess <= newLevel; levelToProcess++) {
+            // Find the correct difficulty tier for the level being processed.
+            const tier = difficultyTiers.find(t => levelToProcess <= t.levelCap);
+            if (tier) {
+                // Update speed multiplier
+                const speedIncrease = tier.getSpeedIncrease(levelToProcess);
+                gameState.gameSpeedMultiplier += speedIncrease;
+
+                // Update spawn interval
+                const intervalReduction = tier.getSpawnIntervalReduction(levelToProcess);
+                gameState.ballSpawnInterval -= intervalReduction;
+            }
+        }
+
+        // Clamp the spawn interval to its minimum value.
+        if (gameState.ballSpawnInterval < MIN_BALL_SPAWN_INTERVAL) {
+            gameState.ballSpawnInterval = MIN_BALL_SPAWN_INTERVAL;
+        }
+
+        gameState.level = newLevel; // Set the new level.
     }
 
     // Allow movement only when tongue is not active
@@ -871,7 +900,7 @@ function drawGame(currentTime) {
     drawBalls();
     drawFloatingScores();
     drawScore();
-    drawLevel(currentTime);
+    drawDebugInfo(currentTime);
 }
 
 async function initGame() {
