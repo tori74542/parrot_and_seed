@@ -5,7 +5,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Debug
-const DEBUG_MODE = true; // Set to true to show collision boxes
+const DEBUG_MODE = false; // Set to true to show collision boxes
 
 // Grid constants
 const GRID_SIZE = 15;
