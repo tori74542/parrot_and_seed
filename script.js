@@ -47,7 +47,9 @@ const gameState = {
     gameSpeedMultiplier: 1,
     level: 1,
     phase: 'title', // 'title', 'playing', 'dying', 'gameOver'
-    lastAnimationTime: 0
+    lastAnimationTime: 0,
+    lastSpawnTime: 0,
+    ballSpawnInterval: BALL_SPAWN_INTERVAL
 };
 
 // Sound effects
@@ -64,6 +66,10 @@ playerSpriteLeft.src = 'parrot_left.png';
 
 const seedSprite = new Image();
 seedSprite.src = 'seed.png';
+
+// Background Image (for testing)
+const backgroundImage = new Image();
+backgroundImage.src = 'background.png'; // Create a 450x330px image with this name
 
 // Player
 const player = {
@@ -107,8 +113,7 @@ function keyDown(e) {
     switch (gameState.phase) {
         case 'title':
             gameState.phase = 'playing';
-            // Start spawning balls only when the game starts
-            ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL);
+            // Spawning is now handled by the main game loop (updateGameLogic)
             break;
         case 'gameOver':
             resetGame();
@@ -176,9 +181,6 @@ function spawnBall() {
     balls.push(ball);
 }
 
-// Initialize as null. The interval will be started when the game begins.
-let ballSpawnerId = null;
-
 // --- Drawing ---
 function gridToPx(gridValue) {
     return gridValue * GRID_SIZE;
@@ -243,7 +245,7 @@ function drawTongue() {
 
         // Draw tongue tip collision point in debug mode
         if (DEBUG_MODE) {
-            ctx.fillStyle = 'purple';
+            ctx.fillStyle = 'red';
             ctx.beginPath();
             ctx.arc(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids), gridToPx(TONGUE_WIDTH_GRIDS * 2), 0, Math.PI * 2);
             ctx.fill();
@@ -336,7 +338,7 @@ function drawBalls() {
 
         // Draw collision box in debug mode
         if (DEBUG_MODE) {
-            ctx.strokeStyle = 'blue';
+            ctx.strokeStyle = 'red';
             ctx.lineWidth = 2;
             ctx.strokeRect(gridToPx(ball.xGrids), gridToPx(ball.yGrids), gridToPx(ball.widthGrids), gridToPx(ball.heightGrids));
         }
@@ -367,15 +369,18 @@ function drawScore() {
     ctx.textAlign = 'left';
 }
 
-function drawLevel() {
+function drawLevel(currentTime) {
     if (!DEBUG_MODE) return;
     ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(0, 150, 255, 0.8)'; // Light blue for debug text
-    ctx.font = '16px "Courier New"';
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.8)'; // Red for debug text
+    ctx.font = '12px "Courier New"';
     ctx.textAlign = 'right';
-    ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 20);
-    ctx.fillText(`Speed: ${gameState.gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 40);
-    ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 60);
+    const elapsedSinceSpawn = currentTime - gameState.lastSpawnTime;
+    ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 15);
+    ctx.fillText(`Speed: ${gameState.gameSpeedMultiplier.toFixed(2)}`, canvas.width - 10, 29);
+    ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 43);
+    const spawnTimerText = `Spawn: ${elapsedSinceSpawn.toFixed(0)} / ${gameState.ballSpawnInterval.toFixed(0)}`;
+    ctx.fillText(spawnTimerText, canvas.width - 10, 57);
     ctx.textAlign = 'left'; // Reset to default
 }
 
@@ -441,10 +446,10 @@ function drawScoreTiers() {
     ctx.save(); // Save the current drawing state
 
     ctx.setLineDash([5, 3]); // Set to a dashed line
-    ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)'; // Light blue, semi-transparent
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Red, semi-transparent
     ctx.lineWidth = 1;
     ctx.font = 'bold 12px "Courier New"';
-    ctx.fillStyle = 'rgba(0, 150, 255, 0.7)'; // Light blue, semi-transparent
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'; // Red, semi-transparent
     ctx.textAlign = 'left';
 
     for (const tier of scoreTiers) {
@@ -714,8 +719,6 @@ function processRepairQueue() {
 
 function endGame() {
     gameState.phase = 'dying';
-    clearInterval(ballSpawnerId);
-    ballSpawnerId = null; // Ensure it's cleared
 }
 
 const PLAYER_DEATH_SPEED = 0.033; // Grids per frame. Slower speed for a longer animation.
@@ -737,6 +740,8 @@ function resetGame() {
     gameState.level = INITIAL_LEVEL;
     gameState.phase = 'title';
     gameState.lastAnimationTime = 0;
+    gameState.lastSpawnTime = 0;
+    gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL;
 
     // Reset player
     player.xGrids = SCREEN_WIDTH_GRIDS / 2 - CHAR_SIZE_GRIDS / 2;
@@ -757,12 +762,6 @@ function resetGame() {
     holes.length = 0;
     fallingBlocks.length = 0;
     repairQueue.length = 0;
-
-    // Clear intervals (though it should already be cleared by endGame)
-    if (ballSpawnerId) {
-        clearInterval(ballSpawnerId);
-        ballSpawnerId = null;
-    }
 }
 
 let lastMoveTime = 0;
@@ -782,7 +781,7 @@ function update(currentTime) {
     }
 
     // --- Drawing (always happens) ---
-    drawGame();
+    drawGame(currentTime);
 
     // --- Draw overlays based on phase ---
     if (gameState.phase === 'title') {
@@ -795,14 +794,17 @@ function update(currentTime) {
 }
 
 function updateGameLogic(currentTime) {
+    // Initialize spawn timer on the first frame of 'playing'
+    if (gameState.lastSpawnTime === 0) {
+        gameState.lastSpawnTime = currentTime;
+    }
+
     // Update game speed based on score
-    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 1000); // Increase level every 10 points
+    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 1000); // Increase level every 1000 points
     if (newLevel > gameState.level) {
         gameState.level = newLevel;
         gameState.gameSpeedMultiplier = 1 + (gameState.level - 1) * 0.1; // Increase speed by 10% per level
-        // Adjust ball spawn interval
-        clearInterval(ballSpawnerId);
-        ballSpawnerId = setInterval(spawnBall, BALL_SPAWN_INTERVAL / gameState.gameSpeedMultiplier);
+        gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL / gameState.gameSpeedMultiplier;
     }
 
     // Allow movement only when tongue is not active
@@ -839,11 +841,19 @@ function updateGameLogic(currentTime) {
     moveFallingBlocks(currentTime);
     moveTongue();
     moveBalls();
+
+    // Spawn balls based on time elapsed within the game loop
+    if (currentTime - gameState.lastSpawnTime > gameState.ballSpawnInterval) {
+        spawnBall();
+        gameState.lastSpawnTime = currentTime;
+    }
+
     checkCollisions();
 }
 
-function drawGame() {
+function drawGame(currentTime) {
     clear();
+    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
     drawGround();
     drawScoreTiers();
     drawFallingBlocks();
@@ -853,7 +863,7 @@ function drawGame() {
     drawBalls();
     drawFloatingScores();
     drawScore();
-    drawLevel();
+    drawLevel(currentTime);
 }
 
 async function initGame() {
