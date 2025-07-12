@@ -1,3 +1,5 @@
+import { generateNormalRandom } from './utils.js';
+
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -19,7 +21,6 @@ const TONGUE_WIDTH_GRIDS = 0.2;
 const TONGUE_TIP_COLLISION_RADIUS_GRIDS = 0.6; // Adjust this value to make collision easier
 const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
-const INITIAL_BALL_SPEED_GRIDS = 0.05;
 const MIN_BALL_SPEED_GRIDS = 0.03;
 const MAX_BALL_SPEED_GRIDS = 0.07;
 const BALL_SPAWN_INTERVAL = 2000; // ms
@@ -176,7 +177,14 @@ function spawnBall() {
         animationFrame: 0,
         animationSequenceIndex: 0,
         lastAnimationTime: 0,
-        speed: MIN_BALL_SPEED_GRIDS + Math.random() * (MAX_BALL_SPEED_GRIDS - MIN_BALL_SPEED_GRIDS)
+        speed: (() => {
+            const mean = (MIN_BALL_SPEED_GRIDS + MAX_BALL_SPEED_GRIDS) / 2;
+            // Set standard deviation so that ~95% of values fall within the min/max range
+            const stdDev = (MAX_BALL_SPEED_GRIDS - MIN_BALL_SPEED_GRIDS) / 4; 
+            const randomNormal = generateNormalRandom() * stdDev + mean;
+            // Clamp the value to ensure it's within the defined min/max bounds
+            return Math.max(MIN_BALL_SPEED_GRIDS, Math.min(randomNormal, MAX_BALL_SPEED_GRIDS));
+        })()
     };
     balls.push(ball);
 }
