@@ -25,6 +25,7 @@ const BALL_SIZE_GRIDS = 1;
 const MIN_BALL_SPEED_GRIDS = 0.03;
 const MAX_BALL_SPEED_GRIDS = 0.07;
 const INITIAL_LEVEL = 1; // For debugging, set initial game level
+const POINTS_PER_LEVEL = 10000; // Points required to gain one level
 
 // Animation constants
 const PLAYER_SPRITE_WIDTH = 128;
@@ -819,7 +820,7 @@ function updateGameLogic(currentTime) {
     }
 
     // Update game speed based on score
-    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / 1000);
+    const newLevel = INITIAL_LEVEL + Math.floor(gameState.score / POINTS_PER_LEVEL);
     if (newLevel > gameState.level) {
         // If multiple levels are gained at once, iterate through each level-up.
         for (let levelToProcess = gameState.level + 1; levelToProcess <= newLevel; levelToProcess++) {
