@@ -1,5 +1,12 @@
-export const BALL_SPAWN_INTERVAL = 3000; // ms, Initial spawn interval.
-export const MIN_BALL_SPAWN_INTERVAL = 500; // ms, The fastest possible spawn rate.
+// seed frequency constants
+export const BALL_SPAWN_INTERVAL = 2500; // ms, Initial spawn interval.
+export const MIN_BALL_SPAWN_INTERVAL = 100; // ms, The fastest possible spawn rate.
+export const BALL_SPAWN_VARIATION_RATIO = 0.5; // The range of spawn time variation as a ratio of the mean (e.g., 0.5 means +/- 50%).
+
+// Seed speed constants
+export const MEAN_BALL_SPEED_GRIDS = 0.04; // The average speed of a seed.
+export const MIN_BALL_SPEED_GRIDS = 0.02; // The absolute minimum speed for a seed, to prevent it from going upwards.
+export const BALL_SPEED_VARIATION_RATIO = 1.5; // The range of speed variation as a ratio of the mean (e.g., 2.0 means +/- 200%).
 
 // Scoring constants
 export const CLEAR_BONUS_POINTS = 100; // Points for seeds cleared by a 'clear' seed
