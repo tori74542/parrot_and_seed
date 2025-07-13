@@ -1,11 +1,11 @@
 import { generateNormalRandom } from './utils.js';
-import { difficultyTiers, BALL_SPAWN_INTERVAL, MIN_BALL_SPAWN_INTERVAL } from './difficulty.js';
+import { difficultyTiers, BALL_SPAWN_INTERVAL, MIN_BALL_SPAWN_INTERVAL, CLEAR_BONUS_POINTS } from './difficulty.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Debug
-const DEBUG_MODE = false; // Set to true to show collision boxes
+const DEBUG_MODE = true; // Set to true to show collision boxes
 
 // Grid constants
 const GRID_SIZE = 15;
@@ -24,7 +24,7 @@ const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
 const MIN_BALL_SPEED_GRIDS = 0.03;
 const MAX_BALL_SPEED_GRIDS = 0.07;
-const INITIAL_LEVEL = 1; // For debugging, set initial game level
+const INITIAL_LEVEL = 10; // For debugging, set initial game level
 const POINTS_PER_LEVEL = 10000; // Points required to gain one level
 
 // Animation constants
@@ -55,9 +55,17 @@ const gameState = {
 };
 
 // Sound effects
-const tongueSound = new Audio('tongue.mp3');
+const tongueSound = new Audio('tongue.wav');
 tongueSound.preload = 'auto'; // 事前読み込み
 tongueSound.volume = 0.5; // 音量調整 (任意)
+
+const catchSound = new Audio('score.wav');
+catchSound.preload = 'auto';
+catchSound.volume = 0.5;
+
+const stepSound = new Audio('step.wav');
+stepSound.preload = 'auto';
+stepSound.volume = 0.05; // Footsteps are usually quieter
 
 // Player sprite
 const playerSpriteRight = new Image();
@@ -571,81 +579,24 @@ function findClosestHole(targetX, holeArray) {
 
 function checkCollisions() {
     // Tongue-Ball collision
-    if (tongue.isExtending && scoreTiers.length > 0) { // Ensure config is loaded
+    if (tongue.isExtending && scoreTiers.length > 0) {
         for (let i = balls.length - 1; i >= 0; i--) {
             const ball = balls[i];
-            
+
             // Calculate distance between tongue tip and ball center
             const ballCenterX = ball.xGrids + ball.widthGrids / 2;
             const ballCenterY = ball.yGrids + ball.heightGrids / 2;
             const distance = Math.sqrt(Math.pow(tongue.tipXGrids - ballCenterX, 2) + Math.pow(tongue.tipYGrids - ballCenterY, 2));
 
-            // Check for collision using distance and combined radii (ball is square, so use half diagonal as radius approximation)
+            // Check for collision using distance and combined radii
             const ballRadiusApprox = Math.sqrt(Math.pow(ball.widthGrids / 2, 2) + Math.pow(ball.heightGrids / 2, 2));
             if (distance < TONGUE_TIP_COLLISION_RADIUS_GRIDS + ballRadiusApprox) {
+                // --- Common logic for any caught seed ---
+                // 1. Play sound effect
+                catchSound.currentTime = 0;
+                catchSound.play();
 
-                // Check if the hit ball is a 'clear' ball
-                if (ball.type === 'clear') {
-                    const ballsToClearCount = balls.length;
-                    let holesToRepairCount = ballsToClearCount - 1; // Don't count the clear ball itself
-
-                    // Add score for all balls on screen and create floating scores
-                    for (const b of balls) {
-                        const points = getPointsForHeight(b.yGrids);
-                        gameState.score += points;
-                        floatingScores.push({
-                            text: `+${points}`,
-                            x: b.xGrids,
-                            y: b.yGrids,
-                            startTime: performance.now()
-                        });
-                    }
-
-                    // --- Queue holes for repair for 'clear' ball ---
-                    const tempHoles = [...holes];
-                    const holesToQueue = [];
-
-                    while (holesToRepairCount > 0 && tempHoles.length > 0) {
-                        const playerCenterX = player.xGrids + player.widthGrids / 2;
-                        const closestHoleX = findClosestHole(playerCenterX, tempHoles);
-                        if (closestHoleX !== null) {
-                            holesToQueue.push(closestHoleX);
-                            tempHoles.splice(tempHoles.indexOf(closestHoleX), 1);
-                        }
-                        holesToRepairCount--;
-                    }
-
-                    // Add the found holes to the global repair queue
-                    if (holesToQueue.length > 0) {
-                        repairQueue.push(...holesToQueue);
-                    }
-                    // --- End queuing ---
-
-                    // Clear all balls from the screen
-                    balls.length = 0;
-
-                    // Retract tongue and exit the collision check for this frame
-                    tongue.isExtending = false;
-                    tongue.isRetracting = true;
-                    break; // Exit the for loop
-                }
-
-
-                // --- Logic for 'normal' and 'repair' balls ---
-                if (ball.type === 'repair') {
-                    if (holes.length > 0) {
-                        const playerCenterX = player.xGrids + player.widthGrids / 2;
-                        const holeToRepairX = findClosestHole(playerCenterX, holes);
-                        if (holeToRepairX !== null) {
-                           // Queue the hole for repair, but only if it's not already queued
-                           if (!repairQueue.includes(holeToRepairX)) {
-                                repairQueue.push(holeToRepairX);
-                           }
-                        }
-                    }
-                }
-
-                // Add score based on height, regardless of ball type
+                // 2. Add score based on height
                 const points = getPointsForHeight(ball.yGrids);
                 gameState.score += points;
                 floatingScores.push({
@@ -655,12 +606,68 @@ function checkCollisions() {
                     startTime: performance.now()
                 });
 
-                // Move the ball to the caughtSeeds array instead of deleting it
+                // 3. Move the ball to the caughtSeeds array
                 const caughtSeed = balls.splice(i, 1)[0];
                 caughtSeeds.push(caughtSeed);
 
+                // 4. Handle type-specific logic
+                if (caughtSeed.type === 'clear') {
+                    // For 'clear' seeds, iterate over the remaining seeds on screen
+                    const remainingBalls = [...balls]; // Create a copy to iterate over
+                    balls.length = 0; // Clear the original array immediately
+
+                    for (const b of remainingBalls) {
+                        // Add the fixed bonus points for each cleared seed
+                        gameState.score += CLEAR_BONUS_POINTS;
+                        // Show floating score, but do NOT play sound
+                        floatingScores.push({
+                            text: `+${CLEAR_BONUS_POINTS}`,
+                            x: b.xGrids,
+                            y: b.yGrids,
+                            startTime: performance.now()
+                        });
+                    }
+
+                    // --- Hole Repair Logic ---
+                    // Repair a number of holes equal to the number of other seeds cleared.
+                    let holesToRepairCount = remainingBalls.length;
+                    const availableHoles = [...holes]; // Create a mutable copy of current holes
+
+                    while (holesToRepairCount > 0 && availableHoles.length > 0) {
+                        const playerCenterX = player.xGrids + player.widthGrids / 2;
+                        // Find the closest hole from the available ones
+                        const closestHoleX = findClosestHole(playerCenterX, availableHoles);
+
+                        if (closestHoleX !== null) {
+                            // Add to repair queue if not already queued
+                            if (!repairQueue.includes(closestHoleX)) {
+                                repairQueue.push(closestHoleX);
+                            }
+                            // Remove from available holes to prevent re-selection
+                            const indexToRemove = availableHoles.indexOf(closestHoleX);
+                            availableHoles.splice(indexToRemove, 1);
+                        }
+                        holesToRepairCount--;
+                    }
+
+                } else if (caughtSeed.type === 'repair') {
+                    if (holes.length > 0) {
+                        const playerCenterX = player.xGrids + player.widthGrids / 2;
+                        const holeToRepairX = findClosestHole(playerCenterX, holes);
+                        if (holeToRepairX !== null) {
+                            if (!repairQueue.includes(holeToRepairX)) {
+                                repairQueue.push(holeToRepairX);
+                            }
+                        }
+                    }
+                }
+
+                // 5. Retract tongue
                 tongue.isExtending = false;
                 tongue.isRetracting = true;
+
+                // Since a seed was caught, exit the loop for this frame
+                break;
             }
         }
     }
@@ -865,6 +872,9 @@ function updateGameLogic(currentTime) {
         if (currentTime - gameState.lastAnimationTime > PLAYER_ANIMATION_SPEED) {
             player.currentFrame = (player.currentFrame + 1) % PLAYER_WALK_FRAMES;
             gameState.lastAnimationTime = currentTime;
+            // Play step sound in sync with animation
+            stepSound.currentTime = 0;
+            stepSound.play();
         }
     } else {
         player.currentFrame = 0; // Reset to first frame when not moving
