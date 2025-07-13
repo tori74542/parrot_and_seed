@@ -55,31 +55,31 @@ const gameState = {
 };
 
 // Sound effects
-const tongueSound = new Audio('tongue.wav');
+const tongueSound = new Audio('assets/sounds/tongue.wav');
 tongueSound.preload = 'auto'; // 事前読み込み
 tongueSound.volume = 0.5; // 音量調整 (任意)
 
-const catchSound = new Audio('score.wav');
+const catchSound = new Audio('assets/sounds/score.wav');
 catchSound.preload = 'auto';
 catchSound.volume = 0.5;
 
-const stepSound = new Audio('step.wav');
+const stepSound = new Audio('assets/sounds/step.wav');
 stepSound.preload = 'auto';
 stepSound.volume = 0.05; // Footsteps are usually quieter
 
 // Player sprite
 const playerSpriteRight = new Image();
-playerSpriteRight.src = 'parrot_right.png';
+playerSpriteRight.src = 'assets/images/parrot_right.png';
 
 const playerSpriteLeft = new Image();
-playerSpriteLeft.src = 'parrot_left.png';
+playerSpriteLeft.src = 'assets/images/parrot_left.png';
 
 const seedSprite = new Image();
-seedSprite.src = 'seed.png';
+seedSprite.src = 'assets/images/seed.png';
 
 // Background Image (for testing)
 const backgroundImage = new Image();
-backgroundImage.src = 'background.png'; // Create a 450x330px image with this name
+backgroundImage.src = 'assets/images/background.png'; // Create a 450x330px image with this name
 
 // Player
 const player = {
