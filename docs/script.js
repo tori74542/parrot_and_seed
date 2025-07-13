@@ -61,18 +61,10 @@ const gameState = {
     ballSpawnInterval: BALL_SPAWN_INTERVAL
 };
 
-// Sound effects
-const tongueSound = new Audio('assets/sounds/tongue.wav');
-tongueSound.preload = 'auto'; // 事前読み込み
-tongueSound.volume = 0.5; // 音量調整 (任意)
-
-const catchSound = new Audio('assets/sounds/score.wav');
-catchSound.preload = 'auto';
-catchSound.volume = 0.5;
-
-const stepSound = new Audio('assets/sounds/step.wav');
-stepSound.preload = 'auto';
-stepSound.volume = 0.05; // Footsteps are usually quieter
+// --- Web Audio API Setup ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+const audioContext = new AudioContext();
+const audioBuffers = {}; // To store decoded audio data
 
 // Player sprite
 const playerSpriteRight = new Image();
@@ -149,13 +141,37 @@ function stopMoveRight() {
     keys.right = false;
 }
 
+function playSound(buffer, volume = 1.0) {
+    // Do nothing if the buffer isn't loaded or the context is not running
+    if (!buffer || !audioContext || audioContext.state === 'suspended') {
+        return;
+    }
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+
+    // Create a GainNode to control the volume
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+
+    // Connect the nodes and play the sound
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    source.start(0);
+}
+
+function handleFirstInteraction() {
+    if (audioContext.state === 'suspended') {
+        audioContext.resume();
+        console.log("AudioContext resumed.");
+    }
+}
+
 function extendTongue() {
     if (gameState.phase !== 'playing') return;
     if (!tongue.isExtending && !tongue.isRetracting) {
         tongue.isExtending = true;
         tongue.direction = player.direction;
-        tongueSound.currentTime = 0;
-        tongueSound.play();
+        playSound(audioBuffers.tongue, 0.5);
     }
 }
 
@@ -169,10 +185,12 @@ function retractTongue() {
 function keyDown(e) {
     switch (gameState.phase) {
         case 'title':
+            handleFirstInteraction();
             gameState.phase = 'playing';
             // Spawning is now handled by the main game loop (updateGameLogic)
             break;
         case 'gameOver':
+            handleFirstInteraction();
             resetGame();
             break;
         case 'playing':
@@ -658,8 +676,7 @@ function checkCollisions() {
             if (distance < TONGUE_TIP_COLLISION_RADIUS_GRIDS + ballRadiusApprox) {
                 // --- Common logic for any caught seed ---
                 // 1. Play sound effect
-                catchSound.currentTime = 0;
-                catchSound.play();
+                playSound(audioBuffers.catch, 0.5);
 
                 // 2. Add score based on height
                 const points = getPointsForHeight(ball.yGrids);
@@ -940,8 +957,7 @@ function updateGameLogic(currentTime) {
             player.currentFrame = (player.currentFrame + 1) % PLAYER_WALK_FRAMES;
             gameState.lastAnimationTime = currentTime;
             // Play step sound in sync with animation
-            stepSound.currentTime = 0;
-            stepSound.play();
+            playSound(audioBuffers.step, 0.05);
         }
     } else {
         player.currentFrame = 0; // Reset to first frame when not moving
@@ -997,6 +1013,7 @@ function setupTouchControls() {
     const addEventListeners = (element, startAction, endAction) => {
         const onStart = (e) => {
             e.preventDefault();
+            handleFirstInteraction();
             // On title or game over screen, any button press starts/restarts the game.
             if (gameState.phase === 'title') {
                 gameState.phase = 'playing';
@@ -1034,6 +1051,29 @@ function setupTouchControls() {
     document.getElementById('touch-controls').addEventListener('contextmenu', e => e.preventDefault());
 }
 
+async function loadSound(url) {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    // Use a callback-based approach for decodeAudioData for wider compatibility
+    return new Promise((resolve, reject) => {
+        audioContext.decodeAudioData(arrayBuffer, resolve, reject);
+    });
+}
+
+async function loadAllSounds() {
+    console.log("Loading sounds...");
+    [
+        audioBuffers.tongue,
+        audioBuffers.catch,
+        audioBuffers.step
+    ] = await Promise.all([
+        loadSound('assets/sounds/tongue.wav'),
+        loadSound('assets/sounds/score.wav'),
+        loadSound('assets/sounds/step.wav')
+    ]);
+    console.log("All sounds loaded and decoded.");
+}
+
 async function initGame() {
     try {
         const response = await fetch('config.json');
@@ -1042,6 +1082,9 @@ async function initGame() {
         }
         const configData = await response.json();
         scoreTiers = configData.scoreTiers;
+
+        // Load all sounds before starting the game
+        await loadAllSounds();
 
         // Set up touch controls after the main game logic is ready
         setupTouchControls();
