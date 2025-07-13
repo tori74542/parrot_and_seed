@@ -1,6 +1,9 @@
 export const BALL_SPAWN_INTERVAL = 3000; // ms, Initial spawn interval.
 export const MIN_BALL_SPAWN_INTERVAL = 500; // ms, The fastest possible spawn rate.
 
+// Scoring constants
+export const CLEAR_BONUS_POINTS = 100; // Points for seeds cleared by a 'clear' seed
+
 // Difficulty settings table. Defines how the game's difficulty scales with the level.
 export const difficultyTiers = [
     // For levels 1-5, a gentle introduction.
