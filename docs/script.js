@@ -7,7 +7,8 @@ import {
     MEAN_BALL_SPEED_GRIDS,
     MIN_BALL_SPEED_GRIDS,
     BALL_SPEED_VARIATION_RATIO,
-    CLEAR_BONUS_POINTS
+    CLEAR_BONUS_POINTS,
+    scoreTiers
 } from './difficulty.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -46,9 +47,6 @@ const PLAYER_Y_OFFSET_GRIDS = 0.25; // プレイヤー描画時のY軸オフセ�
 const SEED_SPRITE_FRAME_WIDTH = 32;
 const SEED_SPRITE_FRAME_HEIGHT = 32;
 const SEED_DRAW_SCALE = 1.5;
-
-// Game Configuration (loaded from config.json)
-let scoreTiers = [];
 
 // Game state using a phase machine
 const gameState = {
@@ -1050,32 +1048,24 @@ async function loadAllSounds() {
     ]);
     console.log("All sounds loaded and decoded.");
 }
-
-async function initGame() {
+async function startGame() {
     try {
-        const response = await fetch('config.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const configData = await response.json();
-        scoreTiers = configData.scoreTiers;
-
         // Load all sounds before starting the game
         await loadAllSounds();
 
         // Set up touch controls after the main game logic is ready
         setupTouchControls();
 
-        // Start the game loop only after config is loaded successfully
+        // Start the game loop
         update(0);
     } catch (error) {
-        console.error("Could not load game configuration:", error);
+        console.error("Could not load game assets:", error);
         // Display a user-friendly error message on the canvas
         ctx.fillStyle = 'red';
         ctx.font = '16px "Courier New"';
         ctx.textAlign = 'center';
-        ctx.fillText('Error: Could not load game config.', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Error: Could not load game assets.', canvas.width / 2, canvas.height / 2);
     }
 }
 
-initGame();
+startGame();

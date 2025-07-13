@@ -53,3 +53,13 @@ export const difficultyTiers = [
         getSpawnIntervalReduction: (level) => 10 // ms
     }
 ];
+
+// Scoring tiers based on height.
+export const scoreTiers = [
+    { heightThreshold: 4, points: 1000 },
+    { heightThreshold: 6, points: 800 },
+    { heightThreshold: 8, points: 400 },
+    { heightThreshold: 12, points: 200 },
+    { heightThreshold: 18, points: 100 },
+    { heightThreshold: 999, points: 50 }
+];
