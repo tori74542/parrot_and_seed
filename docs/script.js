@@ -1,5 +1,5 @@
 import { generateNormalRandom } from './utils.js';
-import { difficultyTiers, BALL_SPAWN_INTERVAL, MIN_BALL_SPAWN_INTERVAL, CLEAR_BONUS_POINTS } from './difficulty.js';
+import { difficultyTiers, BALL_SPAWN_INTERVAL, MIN_BALL_SPAWN_INTERVAL, BALL_SPAWN_VARIATION_RATIO, MEAN_BALL_SPEED_GRIDS, MIN_BALL_SPEED_GRIDS, CLEAR_BONUS_POINTS } from './difficulty.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -22,10 +22,8 @@ const TONGUE_WIDTH_GRIDS = 0.2;
 const TONGUE_TIP_COLLISION_RADIUS_GRIDS = 0.6; // Adjust this value to make collision easier
 const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
-const MIN_BALL_SPEED_GRIDS = 0.03;
-const MAX_BALL_SPEED_GRIDS = 0.07;
 const INITIAL_LEVEL = 1; // For debugging, set initial game level
-const POINTS_PER_LEVEL = 10000; // Points required to gain one level
+const POINTS_PER_LEVEL = 5000; // Points required to gain one level
 
 // Animation constants
 const PLAYER_SPRITE_WIDTH = 128;
@@ -50,7 +48,7 @@ const gameState = {
     level: 1,
     phase: 'title', // 'title', 'playing', 'dying', 'gameOver'
     lastAnimationTime: 0,
-    lastSpawnTime: 0,
+    nextSpawnTime: 0, // Time when the next ball should spawn
     ballSpawnInterval: BALL_SPAWN_INTERVAL
 };
 
@@ -190,12 +188,17 @@ function spawnBall() {
         animationSequenceIndex: 0,
         lastAnimationTime: 0,
         speed: (() => {
-            const mean = (MIN_BALL_SPEED_GRIDS + MAX_BALL_SPEED_GRIDS) / 2;
-            // Set standard deviation so that ~95% of values fall within the min/max range
-            const stdDev = (MAX_BALL_SPEED_GRIDS - MIN_BALL_SPEED_GRIDS) / 4; 
-            const randomNormal = generateNormalRandom() * stdDev + mean;
-            // Clamp the value to ensure it's within the defined min/max bounds
-            return Math.max(MIN_BALL_SPEED_GRIDS, Math.min(randomNormal, MAX_BALL_SPEED_GRIDS));
+            const variation = MEAN_BALL_SPEED_GRIDS * BALL_SPEED_VARIATION_RATIO;
+            const stdDev = variation / 2;
+            const randomNormal = generateNormalRandom() * stdDev + MEAN_BALL_SPEED_GRIDS;
+
+            // Clamp the value to the intended variation range first.
+            const intendedMinSpeed = MEAN_BALL_SPEED_GRIDS - variation;
+            const intendedMaxSpeed = MEAN_BALL_SPEED_GRIDS + variation;
+            const clampedSpeed = Math.max(intendedMinSpeed, Math.min(randomNormal, intendedMaxSpeed));
+
+            // Finally, ensure the speed does not fall below the absolute minimum.
+            return Math.max(MIN_BALL_SPEED_GRIDS, clampedSpeed);
         })()
     };
     balls.push(ball);
@@ -398,19 +401,19 @@ function drawDebugInfo(currentTime) {
 
     // Only update the spawn timer during the 'playing' phase to prevent it from
     // running on the title or game over screens.
-    let elapsedSinceSpawn = 0;
+    let timeToNextSpawn = 0;
     if (gameState.phase === 'playing') {
-        elapsedSinceSpawn = currentTime - gameState.lastSpawnTime;
+        timeToNextSpawn = gameState.nextSpawnTime - currentTime;
     }
     const playerMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
-    const minSeedSpeed = MIN_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
-    const maxSeedSpeed = MAX_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
+    const currentMeanSpeed = MEAN_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
+    const currentVariation = currentMeanSpeed * BALL_SPEED_VARIATION_RATIO;
 
     ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 15);
     ctx.fillText(`Player Interval: ${playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
-    ctx.fillText(`Seed Spd Range: ${minSeedSpeed.toFixed(3)}-${maxSeedSpeed.toFixed(3)}`, canvas.width - 10, 43);
+    ctx.fillText(`Seed Spd: ${currentMeanSpeed.toFixed(3)} ±${currentVariation.toFixed(3)}`, canvas.width - 10, 43);
     ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
-    const spawnTimerText = `Spawn: ${elapsedSinceSpawn.toFixed(0)} / ${gameState.ballSpawnInterval.toFixed(0)}`;
+    const spawnTimerText = `Next Spawn: ${timeToNextSpawn.toFixed(0)}ms`;
     ctx.fillText(spawnTimerText, canvas.width - 10, 71);
     ctx.textAlign = 'left'; // Reset to default
 }
@@ -770,7 +773,7 @@ function resetGame() {
     gameState.level = INITIAL_LEVEL;
     gameState.phase = 'title';
     gameState.lastAnimationTime = 0;
-    gameState.lastSpawnTime = 0;
+    gameState.nextSpawnTime = 0;
     gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL;
 
     // Reset player
@@ -824,9 +827,11 @@ function update(currentTime) {
 }
 
 function updateGameLogic(currentTime) {
-    // Initialize spawn timer on the first frame of 'playing'
-    if (gameState.lastSpawnTime === 0) {
-        gameState.lastSpawnTime = currentTime;
+    // On the first frame of 'playing', schedule the first ball spawn.
+    if (gameState.nextSpawnTime === 0) {
+        // For the very first spawn, just use the base interval without variation
+        // to make it predictable. Subsequent spawns will have variability.
+        gameState.nextSpawnTime = currentTime + gameState.ballSpawnInterval;
     }
 
     // Update game speed based on score
@@ -894,9 +899,14 @@ function updateGameLogic(currentTime) {
     moveBalls();
 
     // Spawn balls based on time elapsed within the game loop
-    if (currentTime - gameState.lastSpawnTime > gameState.ballSpawnInterval) {
+    if (currentTime >= gameState.nextSpawnTime) {
         spawnBall();
-        gameState.lastSpawnTime = currentTime;
+        // Schedule the next spawn with variability
+        const baseInterval = gameState.ballSpawnInterval;
+        const variation = baseInterval * BALL_SPAWN_VARIATION_RATIO;
+        const randomOffset = (Math.random() * 2 - 1) * variation; // A random value between -variation and +variation
+        const nextInterval = baseInterval + randomOffset;
+        gameState.nextSpawnTime = currentTime + nextInterval;
     }
 
     checkCollisions();
