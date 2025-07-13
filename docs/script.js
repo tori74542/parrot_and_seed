@@ -956,8 +956,6 @@ function updateGameLogic(currentTime) {
         if (currentTime - gameState.lastAnimationTime > PLAYER_ANIMATION_SPEED) {
             player.currentFrame = (player.currentFrame + 1) % PLAYER_WALK_FRAMES;
             gameState.lastAnimationTime = currentTime;
-            // Play step sound in sync with animation
-            playSound(audioBuffers.step, 0.05);
         }
     } else {
         player.currentFrame = 0; // Reset to first frame when not moving
@@ -1064,12 +1062,10 @@ async function loadAllSounds() {
     console.log("Loading sounds...");
     [
         audioBuffers.tongue,
-        audioBuffers.catch,
-        audioBuffers.step
+        audioBuffers.catch
     ] = await Promise.all([
         loadSound('assets/sounds/tongue.wav'),
-        loadSound('assets/sounds/score.wav'),
-        loadSound('assets/sounds/step.wav')
+        loadSound('assets/sounds/score.wav')
     ]);
     console.log("All sounds loaded and decoded.");
 }
