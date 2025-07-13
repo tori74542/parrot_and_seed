@@ -1,5 +1,14 @@
 import { generateNormalRandom } from './utils.js';
-import { difficultyTiers, BALL_SPAWN_INTERVAL, MIN_BALL_SPAWN_INTERVAL, BALL_SPAWN_VARIATION_RATIO, MEAN_BALL_SPEED_GRIDS, MIN_BALL_SPEED_GRIDS, CLEAR_BONUS_POINTS } from './difficulty.js';
+import {
+    difficultyTiers,
+    BALL_SPAWN_INTERVAL,
+    MIN_BALL_SPAWN_INTERVAL,
+    BALL_SPAWN_VARIATION_RATIO,
+    MEAN_BALL_SPEED_GRIDS,
+    MIN_BALL_SPEED_GRIDS,
+    BALL_SPEED_VARIATION_RATIO,
+    CLEAR_BONUS_POINTS
+} from './difficulty.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
