@@ -299,12 +299,31 @@ function drawGround() {
 
 function drawTongue() {
     if (tongue.isExtending || tongue.isRetracting || tongue.currentLength > 0) {
-        ctx.strokeStyle = 'pink';
-        ctx.lineWidth = gridToPx(TONGUE_WIDTH_GRIDS);
+        ctx.save(); // Save the current drawing state
+
+        const tongueWidthPx = gridToPx(TONGUE_WIDTH_GRIDS);
+        const outlineWidthPx = tongueWidthPx + 2; // Outline is 2px wider
+
+        // To make the tongue look more organic, set the line caps to round.
+        ctx.lineCap = 'round';
+
+        // 1. Draw the black outline first
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = outlineWidthPx;
         ctx.beginPath();
         ctx.moveTo(gridToPx(tongue.xGrids), gridToPx(tongue.yGrids));
         ctx.lineTo(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids));
         ctx.stroke();
+
+        // 2. Draw the inner color on top
+        ctx.strokeStyle = '#FF8D8B'; // The main color of the tongue
+        ctx.lineWidth = tongueWidthPx;
+        ctx.beginPath();
+        ctx.moveTo(gridToPx(tongue.xGrids), gridToPx(tongue.yGrids));
+        ctx.lineTo(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids));
+        ctx.stroke();
+
+        ctx.restore(); // Restore the drawing state (resets lineCap, etc.)
 
         // Draw tongue tip collision point in debug mode
         if (DEBUG_MODE) {
