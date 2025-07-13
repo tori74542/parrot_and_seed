@@ -6,7 +6,16 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <canvas id="gameCanvas" width="450" height="330"></canvas>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="450" height="330"></canvas>
+        <div id="touch-controls">
+            <div class="movement-controls">
+                <button id="btn-left">◀</button>
+                <button id="btn-right">▶</button>
+            </div>
+            <button id="btn-tongue"></button>
+        </div>
+    </div>
     <!-- Use type="module" to allow import/export between JS files -->
     <script type="module" src="script.js" defer></script>
 </body>

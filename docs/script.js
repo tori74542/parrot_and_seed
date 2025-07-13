@@ -126,6 +126,46 @@ const keys = {
     left: false
 };
 
+/**
+ * --- Action Handlers ---
+ * These functions centralize player actions, allowing them to be triggered
+ * by both keyboard and touch controls.
+ */
+function startMoveLeft() {
+    if (gameState.phase !== 'playing' || tongue.isExtending || tongue.isRetracting) return;
+    keys.left = true;
+}
+
+function stopMoveLeft() {
+    keys.left = false;
+}
+
+function startMoveRight() {
+    if (gameState.phase !== 'playing' || tongue.isExtending || tongue.isRetracting) return;
+    keys.right = true;
+}
+
+function stopMoveRight() {
+    keys.right = false;
+}
+
+function extendTongue() {
+    if (gameState.phase !== 'playing') return;
+    if (!tongue.isExtending && !tongue.isRetracting) {
+        tongue.isExtending = true;
+        tongue.direction = player.direction;
+        tongueSound.currentTime = 0;
+        tongueSound.play();
+    }
+}
+
+function retractTongue() {
+    if (tongue.isExtending) {
+        tongue.isExtending = false;
+        tongue.isRetracting = true;
+    }
+}
+
 function keyDown(e) {
     switch (gameState.phase) {
         case 'title':
@@ -138,20 +178,14 @@ function keyDown(e) {
         case 'playing':
             const key = e.key.toLowerCase();
             if (key === 'arrowright' || key === 'right' || key === 'c') {
-                keys.right = true;
+                startMoveRight();
             } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
-                keys.left = true;
+                startMoveLeft();
             } else if (key === 'd') { // 'd' for debug
                 DEBUG_MODE = !DEBUG_MODE;
                 console.log(`Debug mode toggled to: ${DEBUG_MODE}`);
             } else if (e.key === 'Enter') {
-                // Allow tongue action only if not toggling debug mode
-                if (!tongue.isExtending && !tongue.isRetracting) {
-                    tongue.isExtending = true;
-                    tongue.direction = player.direction;
-                    tongueSound.currentTime = 0;
-                    tongueSound.play();
-                }
+                extendTongue();
             }
             break;
     }
@@ -161,14 +195,11 @@ function keyUp(e) {
     if (gameState.phase !== 'playing') return; // Only handle keyUp during gameplay
     const key = e.key.toLowerCase();
     if (key === 'arrowright' || key === 'right' || key === 'c') {
-        keys.right = false;
+        stopMoveRight();
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
-        keys.left = false;
+        stopMoveLeft();
     } else if (e.key === 'enter') {
-        if (tongue.isExtending) {
-            tongue.isExtending = false;
-            tongue.isRetracting = true;
-        }
+        retractTongue();
     }
 }
 
@@ -268,12 +299,31 @@ function drawGround() {
 
 function drawTongue() {
     if (tongue.isExtending || tongue.isRetracting || tongue.currentLength > 0) {
-        ctx.strokeStyle = 'pink';
-        ctx.lineWidth = gridToPx(TONGUE_WIDTH_GRIDS);
+        ctx.save(); // Save the current drawing state
+
+        const tongueWidthPx = gridToPx(TONGUE_WIDTH_GRIDS);
+        const outlineWidthPx = tongueWidthPx + 2; // Outline is 2px wider
+
+        // To make the tongue look more organic, set the line caps to round.
+        ctx.lineCap = 'round';
+
+        // 1. Draw the black outline first
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = outlineWidthPx;
         ctx.beginPath();
         ctx.moveTo(gridToPx(tongue.xGrids), gridToPx(tongue.yGrids));
         ctx.lineTo(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids));
         ctx.stroke();
+
+        // 2. Draw the inner color on top
+        ctx.strokeStyle = '#FF8D8B'; // The main color of the tongue
+        ctx.lineWidth = tongueWidthPx;
+        ctx.beginPath();
+        ctx.moveTo(gridToPx(tongue.xGrids), gridToPx(tongue.yGrids));
+        ctx.lineTo(gridToPx(tongue.tipXGrids), gridToPx(tongue.tipYGrids));
+        ctx.stroke();
+
+        ctx.restore(); // Restore the drawing state (resets lineCap, etc.)
 
         // Draw tongue tip collision point in debug mode
         if (DEBUG_MODE) {
@@ -936,6 +986,54 @@ function drawGame(currentTime) {
     drawDebugInfo(currentTime);
 }
 
+function setupTouchControls() {
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnTongue = document.getElementById('btn-tongue');
+
+    if (!btnLeft || !btnRight || !btnTongue) return;
+
+    // Helper to add listeners for both mouse and touch events
+    const addEventListeners = (element, startAction, endAction) => {
+        const onStart = (e) => {
+            e.preventDefault();
+            // On title or game over screen, any button press starts/restarts the game.
+            if (gameState.phase === 'title') {
+                gameState.phase = 'playing';
+                return; // Don't perform the action on the first press.
+            }
+            if (gameState.phase === 'gameOver') {
+                resetGame();
+                return; // Don't perform the action on the first press.
+            }
+            // Otherwise, perform the regular start action.
+            startAction();
+        };
+
+        const onEnd = (e) => {
+            e.preventDefault();
+            endAction();
+        };
+
+        // Use { passive: false } to be able to call e.preventDefault()
+        element.addEventListener('touchstart', onStart, { passive: false });
+        element.addEventListener('touchend', onEnd, { passive: false });
+        element.addEventListener('touchcancel', onEnd, { passive: false });
+
+        element.addEventListener('mousedown', onStart);
+        element.addEventListener('mouseup', onEnd);
+        // Also stop action if the mouse leaves the button area while pressed
+        element.addEventListener('mouseleave', onEnd);
+    };
+
+    addEventListeners(btnLeft, startMoveLeft, stopMoveLeft);
+    addEventListeners(btnRight, startMoveRight, stopMoveRight);
+    addEventListeners(btnTongue, extendTongue, retractTongue);
+
+    // Prevent context menu on long press for the entire control area
+    document.getElementById('touch-controls').addEventListener('contextmenu', e => e.preventDefault());
+}
+
 async function initGame() {
     try {
         const response = await fetch('config.json');
@@ -944,6 +1042,9 @@ async function initGame() {
         }
         const configData = await response.json();
         scoreTiers = configData.scoreTiers;
+
+        // Set up touch controls after the main game logic is ready
+        setupTouchControls();
 
         // Start the game loop only after config is loaded successfully
         update(0);
