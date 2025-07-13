@@ -8,7 +8,69 @@ body {
     background-color: #f0f0f0;
 }
 
+#game-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 450px; /* PCでの最大幅を維持 */
+    padding: 0 10px; /* 画面が狭い時に左右の余白を確保 */
+    box-sizing: border-box;
+}
+
 canvas {
+    width: 100%; /* コンテナに合わせて伸縮 */
+    height: auto; /* アスペクト比を維持 */
     border: 1px solid black;
     background-color: #fff;
+}
+
+#touch-controls {
+    /* Initially hidden. Shown via media query for touch devices. */
+    display: none;
+    justify-content: space-between;
+    align-items: center; /* Align items vertically */
+    width: 100%;
+    margin-top: 10px;
+    box-sizing: border-box;
+}
+
+.movement-controls {
+    display: flex;
+    gap: 20px; /* Space between left/right buttons */
+}
+
+#touch-controls button {
+    font-size: 2rem;
+    width: 80px;
+    height: 80px;
+    border: 2px solid #888;
+    border-radius: 50%;
+    background-color: rgba(200, 200, 200, 0.7);
+    -webkit-user-select: none; /* Safari */
+    user-select: none; /* Standard */
+    -webkit-touch-callout: none; /* iOS Safari - prevent callout on long press */
+}
+
+/* Add a visual feedback when a button is pressed */
+#touch-controls button:active {
+    transform: scale(0.95);
+    border-color: #555;
+}
+
+/* Make the action button larger for better balance and usability */
+#btn-tongue {
+    width: 100px;
+    height: 100px;
+    /* font-size is removed as we are using a background image now */
+    background-image: url('assets/images/parrot_right.png');
+    background-size: 1000% 100%; /* 10 frames (1000%) wide, 1 frame (100%) high */
+    background-position: 0% 0%; /* Position to the first frame */
+    background-repeat: no-repeat;
+}
+
+/* Show controls only on touch devices */
+@media (hover: none) and (pointer: coarse) {
+    #touch-controls {
+        display: flex;
+    }
 }
