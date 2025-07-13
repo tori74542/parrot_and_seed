@@ -7,7 +7,8 @@ import {
     MEAN_BALL_SPEED_GRIDS,
     MIN_BALL_SPEED_GRIDS,
     BALL_SPEED_VARIATION_RATIO,
-    CLEAR_BONUS_POINTS
+    CLEAR_BONUS_POINTS,
+    scoreTiers
 } from './difficulty.js';
 
 const canvas = document.getElementById('gameCanvas');
@@ -47,9 +48,6 @@ const SEED_SPRITE_FRAME_WIDTH = 32;
 const SEED_SPRITE_FRAME_HEIGHT = 32;
 const SEED_DRAW_SCALE = 1.5;
 
-// Game Configuration (loaded from config.json)
-let scoreTiers = [];
-
 // Game state using a phase machine
 const gameState = {
     score: 0,
@@ -73,8 +71,14 @@ playerSpriteRight.src = 'assets/images/parrot_right.png';
 const playerSpriteLeft = new Image();
 playerSpriteLeft.src = 'assets/images/parrot_left.png';
 
-const seedSprite = new Image();
-seedSprite.src = 'assets/images/seed.png';
+const seedSprites = {
+    normal: new Image(),
+    repair: new Image(),
+    clear: new Image()
+};
+seedSprites.normal.src = 'assets/images/seed.png';
+seedSprites.repair.src = 'assets/images/seed_repair.png';
+seedSprites.clear.src = 'assets/images/seed_clear.png';
 
 // Background Image (for testing)
 const backgroundImage = new Image();
@@ -387,28 +391,9 @@ function moveTongue() {
     }
 }
 
-function applyItemStyle(ctx, itemType) {
-    switch (itemType) {
-        case 'repair':
-            ctx.filter = 'sepia(100%) brightness(150%) saturate(30%)'; // Cream
-            break;
-        case 'clear':
-            // Alternating brightness effect every 200ms
-            if (Math.floor(performance.now() / 200) % 2 === 0) {
-                ctx.filter = 'hue-rotate(330deg) brightness(1.5)'; // Bright reddish
-            } else {
-                ctx.filter = 'hue-rotate(330deg) brightness(0.7)'; // Dark reddish
-            }
-            break;
-        default: // 'normal'
-            ctx.filter = 'none';
-            break;
-    }
-}
-
 function drawCaughtSeeds() {
     caughtSeeds.forEach(seed => {
-        applyItemStyle(ctx, seed.type);
+        const spriteToDraw = seedSprites[seed.type] || seedSprites.normal;
 
         const sx = seed.animationFrame * SEED_SPRITE_FRAME_WIDTH;
         const sy = 0;
@@ -417,16 +402,13 @@ function drawCaughtSeeds() {
         // Draw the seed at the tip of the tongue
         const x = gridToPx(tongue.tipXGrids) - drawWidth / 2;
         const y = gridToPx(tongue.tipYGrids) - drawHeight / 2;
-        ctx.drawImage(seedSprite, sx, sy, SEED_SPRITE_FRAME_WIDTH, SEED_SPRITE_FRAME_HEIGHT, x, y, drawWidth, drawHeight);
-
-        // Reset filter
-        ctx.filter = 'none';
+        ctx.drawImage(spriteToDraw, sx, sy, SEED_SPRITE_FRAME_WIDTH, SEED_SPRITE_FRAME_HEIGHT, x, y, drawWidth, drawHeight);
     });
 }
 
 function drawBalls() {
     balls.forEach(ball => {
-        applyItemStyle(ctx, ball.type);
+        const spriteToDraw = seedSprites[ball.type] || seedSprites.normal;
 
         const sx = ball.animationFrame * SEED_SPRITE_FRAME_WIDTH;
         const sy = 0;
@@ -434,7 +416,7 @@ function drawBalls() {
         const drawHeight = gridToPx(ball.heightGrids) * SEED_DRAW_SCALE;
         const x = gridToPx(ball.xGrids) - (drawWidth - gridToPx(ball.widthGrids)) / 2;
         const y = gridToPx(ball.yGrids) - (drawHeight - gridToPx(ball.heightGrids)) / 2;
-        ctx.drawImage(seedSprite, sx, sy, SEED_SPRITE_FRAME_WIDTH, SEED_SPRITE_FRAME_HEIGHT, x, y, drawWidth, drawHeight);
+        ctx.drawImage(spriteToDraw, sx, sy, SEED_SPRITE_FRAME_WIDTH, SEED_SPRITE_FRAME_HEIGHT, x, y, drawWidth, drawHeight);
 
         // Draw collision box in debug mode
         if (DEBUG_MODE) {
@@ -442,9 +424,6 @@ function drawBalls() {
             ctx.lineWidth = 2;
             ctx.strokeRect(gridToPx(ball.xGrids), gridToPx(ball.yGrids), gridToPx(ball.widthGrids), gridToPx(ball.heightGrids));
         }
-
-        // Reset filter to avoid affecting other drawings
-        ctx.filter = 'none';
     });
 }
 
@@ -956,8 +935,6 @@ function updateGameLogic(currentTime) {
         if (currentTime - gameState.lastAnimationTime > PLAYER_ANIMATION_SPEED) {
             player.currentFrame = (player.currentFrame + 1) % PLAYER_WALK_FRAMES;
             gameState.lastAnimationTime = currentTime;
-            // Play step sound in sync with animation
-            playSound(audioBuffers.step, 0.05);
         }
     } else {
         player.currentFrame = 0; // Reset to first frame when not moving
@@ -1064,41 +1041,31 @@ async function loadAllSounds() {
     console.log("Loading sounds...");
     [
         audioBuffers.tongue,
-        audioBuffers.catch,
-        audioBuffers.step
+        audioBuffers.catch
     ] = await Promise.all([
         loadSound('assets/sounds/tongue.wav'),
-        loadSound('assets/sounds/score.wav'),
-        loadSound('assets/sounds/step.wav')
+        loadSound('assets/sounds/score.wav')
     ]);
     console.log("All sounds loaded and decoded.");
 }
-
-async function initGame() {
+async function startGame() {
     try {
-        const response = await fetch('config.json');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const configData = await response.json();
-        scoreTiers = configData.scoreTiers;
-
         // Load all sounds before starting the game
         await loadAllSounds();
 
         // Set up touch controls after the main game logic is ready
         setupTouchControls();
 
-        // Start the game loop only after config is loaded successfully
+        // Start the game loop
         update(0);
     } catch (error) {
-        console.error("Could not load game configuration:", error);
+        console.error("Could not load game assets:", error);
         // Display a user-friendly error message on the canvas
         ctx.fillStyle = 'red';
         ctx.font = '16px "Courier New"';
         ctx.textAlign = 'center';
-        ctx.fillText('Error: Could not load game config.', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('Error: Could not load game assets.', canvas.width / 2, canvas.height / 2);
     }
 }
 
-initGame();
+startGame();
