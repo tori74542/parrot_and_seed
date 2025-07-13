@@ -5,7 +5,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 // Debug
-const DEBUG_MODE = true; // Set to true to show collision boxes
+let DEBUG_MODE = false; // Set to true to show collision boxes. Can be toggled with Space + Enter.
 
 // Grid constants
 const GRID_SIZE = 15;
@@ -116,7 +116,8 @@ const repairQueue = []; // Stores x-coordinates of holes queued for repair
 // Keyboard input
 const keys = {
     right: false,
-    left: false
+    left: false,
+    space: false
 };
 
 function keyDown(e) {
@@ -134,14 +135,21 @@ function keyDown(e) {
                 keys.right = true;
             } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
                 keys.left = true;
+            } else if (key === ' ') { // Space key
+                keys.space = true;
             } else if (e.key === 'Enter') {
-                // Allow tongue action only when not extending/retracting
-            if (!tongue.isExtending && !tongue.isRetracting) {
-                tongue.isExtending = true;
-                tongue.direction = player.direction;
+                // Toggle debug mode if Space is also held down
+                if (keys.space) {
+                    DEBUG_MODE = !DEBUG_MODE;
+                    console.log(`Debug mode toggled to: ${DEBUG_MODE}`);
+                }
+                // Allow tongue action only if not toggling debug mode
+                else if (!tongue.isExtending && !tongue.isRetracting) {
+                    tongue.isExtending = true;
+                    tongue.direction = player.direction;
                     tongueSound.currentTime = 0;
-                tongueSound.play();
-            }
+                    tongueSound.play();
+                }
             }
             break;
     }
@@ -154,6 +162,8 @@ function keyUp(e) {
         keys.right = false;
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         keys.left = false;
+    } else if (key === ' ') { // Space key
+        keys.space = false;
     } else if (e.key === 'enter') {
         if (tongue.isExtending) {
             tongue.isExtending = false;
