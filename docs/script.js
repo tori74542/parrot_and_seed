@@ -40,7 +40,7 @@ const PLAYER_SPRITE_WIDTH = 128;
 const PLAYER_SPRITE_HEIGHT = 128;
 const PLAYER_WALK_FRAMES = 10;
 const PLAYER_ANIMATION_SPEED = 100; // ms per frame
-const PLAYER_DRAW_SCALE = 1.5;
+const PLAYER_DRAW_SCALE = 2.0;
 const PLAYER_Y_OFFSET_GRIDS = 0.25; // プレイヤー描画時のY軸オフセット
 
 // Seed sprite constants
