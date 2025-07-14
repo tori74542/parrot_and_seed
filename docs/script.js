@@ -9,6 +9,7 @@ import {
     BALL_SPEED_VARIATION_RATIO,
     INITIAL_TONGUE_SPEED,
     TONGUE_RETRACT_SPEED,
+    INITIAL_PLAYER_MOVE_INTERVAL,
     CLEAR_BONUS_POINTS,
     scoreTiers
 } from './difficulty.js';
@@ -58,7 +59,8 @@ const gameState = {
     lastAnimationTime: 0,
     nextSpawnTime: 0, // Time when the next ball should spawn
     ballSpawnInterval: BALL_SPAWN_INTERVAL,
-    tongueSpeed: INITIAL_TONGUE_SPEED // Initial tongue speed
+    tongueSpeed: INITIAL_TONGUE_SPEED, // Initial tongue speed
+    playerMoveInterval: INITIAL_PLAYER_MOVE_INTERVAL // Initial player move interval
 };
 
 // --- Web Audio API Setup ---
@@ -462,12 +464,11 @@ function drawDebugInfo(currentTime) {
     if (gameState.phase === 'playing') {
         timeToNextSpawn = gameState.nextSpawnTime - currentTime;
     }
-    const playerMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
     const currentMeanSpeed = MEAN_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
     const currentVariation = currentMeanSpeed * BALL_SPEED_VARIATION_RATIO;
 
     ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 15);
-    ctx.fillText(`Player Interval: ${playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
+    ctx.fillText(`Player Interval: ${gameState.playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
     ctx.fillText(`Seed Spd: ${currentMeanSpeed.toFixed(3)} ±${currentVariation.toFixed(3)}`, canvas.width - 10, 43);
     ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
     const spawnTimerText = `Next Spawn: ${timeToNextSpawn.toFixed(0)}ms`;
@@ -833,6 +834,7 @@ function resetGame() {
     gameState.nextSpawnTime = 0;
     gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL;
     gameState.tongueSpeed = INITIAL_TONGUE_SPEED;
+    gameState.playerMoveInterval = INITIAL_PLAYER_MOVE_INTERVAL;
 
     // Reset player
     player.xGrids = SCREEN_WIDTH_GRIDS / 2 - CHAR_SIZE_GRIDS / 2;
@@ -855,8 +857,7 @@ function resetGame() {
     repairQueue.length = 0;
 }
 
-let lastMoveTime = 0;
-const MOVE_INTERVAL = 50; // ms, adjust for desired speed
+    let lastMoveTime = 0;
 let animationFrameId;
 
 function update(currentTime) {
@@ -911,6 +912,10 @@ function updateGameLogic(currentTime) {
                 // Update spawn interval
                 const intervalReduction = tier.getSpawnIntervalReduction(levelToProcess);
                 gameState.ballSpawnInterval -= intervalReduction;
+
+                // Update player move interval
+                const playerIntervalReduction = tier.getPlayerMoveIntervalReduction(levelToProcess);
+                gameState.playerMoveInterval -= playerIntervalReduction;
             }
         }
 
@@ -947,7 +952,7 @@ function updateGameLogic(currentTime) {
         player.currentFrame = 0; // Reset to first frame when not moving
     }
     
-    const currentMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
+    const currentMoveInterval = gameState.playerMoveInterval;
     if (currentTime - lastMoveTime > currentMoveInterval) {
         movePlayer();
         lastMoveTime = currentTime;
