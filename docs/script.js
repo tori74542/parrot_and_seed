@@ -471,7 +471,7 @@ function drawDebugInfo(currentTime) {
     ctx.fillText(`Player Interval: ${gameState.playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
     ctx.fillText(`Seed Spd: ${currentMeanSpeed.toFixed(3)} ±${currentVariation.toFixed(3)}`, canvas.width - 10, 43);
     ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
-    const spawnTimerText = `Next Spawn: ${timeToNextSpawn.toFixed(0)}ms`;
+    const spawnTimerText = `Avg Spawn: ${gameState.ballSpawnInterval.toFixed(0)}ms`;
     ctx.fillText(spawnTimerText, canvas.width - 10, 71);
     ctx.fillText(`Tongue Spd: ${gameState.tongueSpeed.toFixed(3)}`, canvas.width - 10, 85);
     ctx.textAlign = 'left'; // Reset to default
