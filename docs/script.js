@@ -37,6 +37,14 @@ const BALL_SIZE_GRIDS = 1;
 const INITIAL_LEVEL = 1; // For debugging, set initial game level
 const POINTS_PER_LEVEL = 5000; // Points required to gain one level
 
+// Fireworks constants
+const FIREWORKS_THRESHOLD_POINTS = 1000; // Points required to trigger fireworks
+const FIREWORKS_PARTICLE_COUNT = 20; // Number of particles in a fireworks effect
+const FIREWORKS_PARTICLE_LIFETIME = 1000; // ms
+const FIREWORKS_PARTICLE_SPEED = 0.05; // Grids per frame
+
+
+
 // Animation constants
 const PLAYER_SPRITE_WIDTH = 128;
 const PLAYER_SPRITE_HEIGHT = 128;
@@ -114,6 +122,7 @@ const tongue = {
 const balls = [];
 const caughtSeeds = [];
 const floatingScores = [];
+const fireworks = []; // To store active fireworks particles
 // Holes
 const holes = []; // Stores x-grid positions of holes
 const fallingBlocks = []; // Stores blocks falling to repair holes
@@ -471,7 +480,7 @@ function drawDebugInfo(currentTime) {
     ctx.fillText(`Player Interval: ${gameState.playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
     ctx.fillText(`Seed Spd: ${currentMeanSpeed.toFixed(3)} ±${currentVariation.toFixed(3)}`, canvas.width - 10, 43);
     ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
-    const spawnTimerText = `Next Spawn: ${timeToNextSpawn.toFixed(0)}ms`;
+    const spawnTimerText = `Avg Spawn: ${gameState.ballSpawnInterval.toFixed(0)}ms`;
     ctx.fillText(spawnTimerText, canvas.width - 10, 71);
     ctx.fillText(`Tongue Spd: ${gameState.tongueSpeed.toFixed(3)}`, canvas.width - 10, 85);
     ctx.textAlign = 'left'; // Reset to default
@@ -556,6 +565,29 @@ function drawScoreTiers() {
     }
 
     ctx.restore(); // Restore to the original drawing state
+}
+
+function drawFireworks() {
+    for (let i = fireworks.length - 1; i >= 0; i--) {
+        const p = fireworks[i];
+        ctx.globalAlpha = p.life / p.maxLife; // Fade out
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(gridToPx(p.x), gridToPx(p.y), 2, 0, Math.PI * 2); // Draw small circles
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1; // Reset alpha
+}
+    function updateFireworks() {
+    for (let i = fireworks.length - 1; i >= 0; i--) {
+        const p = fireworks[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1000 / 60; // Assuming 60 FPS
+        if (p.life <= 0) {
+            fireworks.splice(i, 1);
+        }
+    }
 }
 
 function clear() {
@@ -656,10 +688,6 @@ function checkCollisions() {
             // Check for collision using distance and combined radii
             const ballRadiusApprox = Math.sqrt(Math.pow(ball.widthGrids / 2, 2) + Math.pow(ball.heightGrids / 2, 2));
             if (distance < TONGUE_TIP_COLLISION_RADIUS_GRIDS + ballRadiusApprox) {
-                // --- Common logic for any caught seed ---
-                // 1. Play sound effect
-                playSound(audioBuffers.catch, 0.5);
-
                 // 2. Add score based on height
                 const points = getPointsForHeight(ball.yGrids);
                 gameState.score += points;
@@ -669,6 +697,29 @@ function checkCollisions() {
                     y: ball.yGrids,
                     startTime: performance.now()
                 });
+
+                // --- Common logic for any caught seed ---
+                // 1. Play sound effect
+                if (points >= FIREWORKS_THRESHOLD_POINTS) {
+                    playSound(audioBuffers.score_high, 0.5);
+                } else {
+                    playSound(audioBuffers.catch, 0.5);
+                }
+
+                // Trigger fireworks if points are high enough
+                if (points >= FIREWORKS_THRESHOLD_POINTS) {
+                    for (let j = 0; j < FIREWORKS_PARTICLE_COUNT; j++) {
+                        fireworks.push({
+                            x: ball.xGrids + ball.widthGrids / 2,
+                            y: ball.yGrids + ball.heightGrids / 2,
+                            vx: (Math.random() - 0.5) * FIREWORKS_PARTICLE_SPEED * 2,
+                            vy: (Math.random() - 0.5) * FIREWORKS_PARTICLE_SPEED * 2,
+                            life: FIREWORKS_PARTICLE_LIFETIME,
+                            maxLife: FIREWORKS_PARTICLE_LIFETIME,
+                            color: `hsl(${Math.random() * 360}, 100%, 50%)` // Random color
+                        });
+                    }
+                }
 
                 // 3. Move the ball to the caughtSeeds array
                 const caughtSeed = balls.splice(i, 1)[0];
@@ -961,6 +1012,7 @@ function updateGameLogic(currentTime) {
     moveFallingBlocks(currentTime);
     moveTongue();
     moveBalls();
+    updateFireworks();
 
     // Spawn balls based on time elapsed within the game loop
     if (currentTime >= gameState.nextSpawnTime) {
@@ -987,6 +1039,7 @@ function drawGame(currentTime) {
     drawPlayer();
     drawBalls();
     drawFloatingScores();
+    drawFireworks();
     drawScore();
     drawDebugInfo(currentTime);
 }
@@ -1053,10 +1106,12 @@ async function loadAllSounds() {
     console.log("Loading sounds...");
     [
         audioBuffers.tongue,
-        audioBuffers.catch
+        audioBuffers.catch,
+        audioBuffers.score_high
     ] = await Promise.all([
         loadSound('assets/sounds/tongue.wav'),
-        loadSound('assets/sounds/score.wav')
+        loadSound('assets/sounds/score.wav'),
+        loadSound('assets/sounds/score_high.wav')
     ]);
     console.log("All sounds loaded and decoded.");
 }

@@ -32,7 +32,7 @@ export const difficultyTiers = [
     {
         levelCap: 10,
         getSpeedIncrease: (level) => 0.10,
-        getSpawnIntervalReduction: (level) => 50, // ms
+        getSpawnIntervalReduction: (level) => 60, // ms
         getTongueSpeedIncrease: (level) => 0.02,
         getPlayerMoveIntervalReduction: (level) => 2 // ms
     },
@@ -40,7 +40,7 @@ export const difficultyTiers = [
     {
         levelCap: 15,
         getSpeedIncrease: (level) => 0.10,
-        getSpawnIntervalReduction: (level) => 50, // ms
+        getSpawnIntervalReduction: (level) => 60, // ms
         getTongueSpeedIncrease: (level) => 0.00,
         getPlayerMoveIntervalReduction: (level) => 0 // ms
     },
