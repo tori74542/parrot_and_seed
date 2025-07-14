@@ -8,6 +8,7 @@ import {
     MIN_BALL_SPEED_GRIDS,
     BALL_SPEED_VARIATION_RATIO,
     INITIAL_TONGUE_SPEED,
+    TONGUE_RETRACT_SPEED,
     CLEAR_BONUS_POINTS,
     scoreTiers
 } from './difficulty.js';
@@ -206,7 +207,7 @@ function keyDown(e) {
             } else if (key === 'd') { // 'd' for debug
                 DEBUG_MODE = !DEBUG_MODE;
                 console.log(`Debug mode toggled to: ${DEBUG_MODE}`);
-            } else if (e.key === 'Enter') {
+            } else if (e.key.toLowerCase() === 'enter') {
                 extendTongue();
             }
             break;
@@ -220,7 +221,7 @@ function keyUp(e) {
         stopMoveRight();
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         stopMoveLeft();
-    } else if (e.key === 'enter') {
+    } else if (e.key.toLowerCase() === 'enter') {
         retractTongue();
     }
 }
@@ -371,7 +372,7 @@ function moveTongue() {
             tongue.isRetracting = true;
         }
     } else if (tongue.isRetracting) {
-        tongue.currentLength -= gameState.tongueSpeed;
+        tongue.currentLength -= TONGUE_RETRACT_SPEED;
         if (tongue.currentLength <= 0) {
             tongue.currentLength = 0;
             tongue.isRetracting = false;
@@ -471,6 +472,7 @@ function drawDebugInfo(currentTime) {
     ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
     const spawnTimerText = `Next Spawn: ${timeToNextSpawn.toFixed(0)}ms`;
     ctx.fillText(spawnTimerText, canvas.width - 10, 71);
+    ctx.fillText(`Tongue Spd: ${gameState.tongueSpeed.toFixed(3)}`, canvas.width - 10, 85);
     ctx.textAlign = 'left'; // Reset to default
 }
 
