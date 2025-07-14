@@ -8,6 +8,9 @@ export const MEAN_BALL_SPEED_GRIDS = 0.04; // The average speed of a seed.
 export const MIN_BALL_SPEED_GRIDS = 0.02; // The absolute minimum speed for a seed, to prevent it from going upwards.
 export const BALL_SPEED_VARIATION_RATIO = 1.5; // The range of speed variation as a ratio of the mean (e.g., 2.0 means +/- 200%).
 
+// Tongue speed constants
+export const INITIAL_TONGUE_SPEED = 0.5; // The initial speed of the tongue.
+
 // Scoring constants
 export const CLEAR_BONUS_POINTS = 100; // Points for seeds cleared by a 'clear' seed
 
@@ -17,19 +20,22 @@ export const difficultyTiers = [
     {
         levelCap: 5,
         getSpeedIncrease: (level) => 0.05,
-        getSpawnIntervalReduction: (level) => 300 // ms
+        getSpawnIntervalReduction: (level) => 300, // ms
+        getTongueSpeedIncrease: (level) => 0.05
     },
     // For levels 6-10, the difficulty ramps up.
     {
         levelCap: 10,
         getSpeedIncrease: (level) => 0.10,
-        getSpawnIntervalReduction: (level) => 200 // ms
+        getSpawnIntervalReduction: (level) => 200, // ms
+        getTongueSpeedIncrease: (level) => 0.1
     },
     // For levels 11-15, a slight breather.
     {
         levelCap: 15,
         getSpeedIncrease: (level) => 0.10,
-        getSpawnIntervalReduction: (level) => 50 // ms
+        getSpawnIntervalReduction: (level) => 50, // ms
+        getTongueSpeedIncrease: (level) => 0.05
     },
     // For levels 16-30, use a logarithmic curve for both speed and spawn rate.
     // The increase/reduction amount gets smaller as the level gets higher.
@@ -44,13 +50,19 @@ export const difficultyTiers = [
             const startLevelOfTier = 16;
             const scale = 100; // Base reduction amount
             return scale / (level - startLevelOfTier + 1);
+        },
+        getTongueSpeedIncrease: (level) => {
+            const startLevelOfTier = 16;
+            const scale = 0.2; // Adjust this to control the curve's flatness.
+            return scale / (level - startLevelOfTier + 1);
         }
     },
     // For levels 31 and above, the difficulty increase is minimal (soft cap).
     {
         levelCap: Infinity,
         getSpeedIncrease: (level) => 0.02,
-        getSpawnIntervalReduction: (level) => 10 // ms
+        getSpawnIntervalReduction: (level) => 10, // ms
+        getTongueSpeedIncrease: (level) => 0.01
     }
 ];
 

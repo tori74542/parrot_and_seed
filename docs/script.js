@@ -7,6 +7,7 @@ import {
     MEAN_BALL_SPEED_GRIDS,
     MIN_BALL_SPEED_GRIDS,
     BALL_SPEED_VARIATION_RATIO,
+    INITIAL_TONGUE_SPEED,
     CLEAR_BONUS_POINTS,
     scoreTiers
 } from './difficulty.js';
@@ -30,7 +31,6 @@ const CHAR_SIZE_GRIDS = 1;
 const CHAR_SPEED_GRIDS = 0.5;
 const TONGUE_WIDTH_GRIDS = 0.2;
 const TONGUE_TIP_COLLISION_RADIUS_GRIDS = 0.6; // Adjust this value to make collision easier
-const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
 const INITIAL_LEVEL = 1; // For debugging, set initial game level
 const POINTS_PER_LEVEL = 5000; // Points required to gain one level
@@ -56,7 +56,8 @@ const gameState = {
     phase: 'title', // 'title', 'playing', 'dying', 'gameOver'
     lastAnimationTime: 0,
     nextSpawnTime: 0, // Time when the next ball should spawn
-    ballSpawnInterval: BALL_SPAWN_INTERVAL
+    ballSpawnInterval: BALL_SPAWN_INTERVAL,
+    tongueSpeed: INITIAL_TONGUE_SPEED // Initial tongue speed
 };
 
 // --- Web Audio API Setup ---
@@ -102,7 +103,6 @@ const tongue = {
     currentLength: 0,
     isExtending: false,
     isRetracting: false,
-    speed: TONGUE_SPEED_GRIDS, // Max length of the tongue
     direction: 1, // 1 for right, -1 for left
     tipXGrids: 0,
     tipYGrids: 0
@@ -363,7 +363,7 @@ function moveTongue() {
     tongue.yGrids = player.yGrids + player.heightGrids / 2;
 
     if (tongue.isExtending) {
-        tongue.currentLength += tongue.speed * gameState.gameSpeedMultiplier;
+        tongue.currentLength += gameState.tongueSpeed * gameState.gameSpeedMultiplier;
 
         // Check if tongue tip hits screen boundaries
         if (tongue.tipXGrids < 0 || tongue.tipXGrids > SCREEN_WIDTH_GRIDS || tongue.tipYGrids < 0) {
@@ -371,7 +371,7 @@ function moveTongue() {
             tongue.isRetracting = true;
         }
     } else if (tongue.isRetracting) {
-        tongue.currentLength -= tongue.speed;
+        tongue.currentLength -= gameState.tongueSpeed;
         if (tongue.currentLength <= 0) {
             tongue.currentLength = 0;
             tongue.isRetracting = false;
@@ -830,6 +830,7 @@ function resetGame() {
     gameState.lastAnimationTime = 0;
     gameState.nextSpawnTime = 0;
     gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL;
+    gameState.tongueSpeed = INITIAL_TONGUE_SPEED;
 
     // Reset player
     player.xGrids = SCREEN_WIDTH_GRIDS / 2 - CHAR_SIZE_GRIDS / 2;
@@ -900,6 +901,10 @@ function updateGameLogic(currentTime) {
                 // Update speed multiplier
                 const speedIncrease = tier.getSpeedIncrease(levelToProcess);
                 gameState.gameSpeedMultiplier += speedIncrease;
+
+                // Update tongue speed
+                const tongueSpeedIncrease = tier.getTongueSpeedIncrease(levelToProcess);
+                gameState.tongueSpeed += tongueSpeedIncrease;
 
                 // Update spawn interval
                 const intervalReduction = tier.getSpawnIntervalReduction(levelToProcess);
