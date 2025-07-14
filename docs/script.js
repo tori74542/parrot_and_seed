@@ -7,6 +7,9 @@ import {
     MEAN_BALL_SPEED_GRIDS,
     MIN_BALL_SPEED_GRIDS,
     BALL_SPEED_VARIATION_RATIO,
+    INITIAL_TONGUE_SPEED,
+    TONGUE_RETRACT_SPEED,
+    INITIAL_PLAYER_MOVE_INTERVAL,
     CLEAR_BONUS_POINTS,
     scoreTiers
 } from './difficulty.js';
@@ -30,7 +33,6 @@ const CHAR_SIZE_GRIDS = 1;
 const CHAR_SPEED_GRIDS = 0.5;
 const TONGUE_WIDTH_GRIDS = 0.2;
 const TONGUE_TIP_COLLISION_RADIUS_GRIDS = 0.6; // Adjust this value to make collision easier
-const TONGUE_SPEED_GRIDS = 1;
 const BALL_SIZE_GRIDS = 1;
 const INITIAL_LEVEL = 1; // For debugging, set initial game level
 const POINTS_PER_LEVEL = 5000; // Points required to gain one level
@@ -40,7 +42,7 @@ const PLAYER_SPRITE_WIDTH = 128;
 const PLAYER_SPRITE_HEIGHT = 128;
 const PLAYER_WALK_FRAMES = 10;
 const PLAYER_ANIMATION_SPEED = 100; // ms per frame
-const PLAYER_DRAW_SCALE = 1.5;
+const PLAYER_DRAW_SCALE = 2.0;
 const PLAYER_Y_OFFSET_GRIDS = 0.25; // プレイヤー描画時のY軸オフセット
 
 // Seed sprite constants
@@ -56,7 +58,9 @@ const gameState = {
     phase: 'title', // 'title', 'playing', 'dying', 'gameOver'
     lastAnimationTime: 0,
     nextSpawnTime: 0, // Time when the next ball should spawn
-    ballSpawnInterval: BALL_SPAWN_INTERVAL
+    ballSpawnInterval: BALL_SPAWN_INTERVAL,
+    tongueSpeed: INITIAL_TONGUE_SPEED, // Initial tongue speed
+    playerMoveInterval: INITIAL_PLAYER_MOVE_INTERVAL // Initial player move interval
 };
 
 // --- Web Audio API Setup ---
@@ -102,7 +106,6 @@ const tongue = {
     currentLength: 0,
     isExtending: false,
     isRetracting: false,
-    speed: TONGUE_SPEED_GRIDS, // Max length of the tongue
     direction: 1, // 1 for right, -1 for left
     tipXGrids: 0,
     tipYGrids: 0
@@ -206,7 +209,7 @@ function keyDown(e) {
             } else if (key === 'd') { // 'd' for debug
                 DEBUG_MODE = !DEBUG_MODE;
                 console.log(`Debug mode toggled to: ${DEBUG_MODE}`);
-            } else if (e.key === 'Enter') {
+            } else if (e.key.toLowerCase() === 'enter') {
                 extendTongue();
             }
             break;
@@ -220,7 +223,7 @@ function keyUp(e) {
         stopMoveRight();
     } else if (key === 'arrowleft' || key === 'left' || key === 'z') {
         stopMoveLeft();
-    } else if (e.key === 'enter') {
+    } else if (e.key.toLowerCase() === 'enter') {
         retractTongue();
     }
 }
@@ -363,7 +366,7 @@ function moveTongue() {
     tongue.yGrids = player.yGrids + player.heightGrids / 2;
 
     if (tongue.isExtending) {
-        tongue.currentLength += tongue.speed * gameState.gameSpeedMultiplier;
+        tongue.currentLength += gameState.tongueSpeed * gameState.gameSpeedMultiplier;
 
         // Check if tongue tip hits screen boundaries
         if (tongue.tipXGrids < 0 || tongue.tipXGrids > SCREEN_WIDTH_GRIDS || tongue.tipYGrids < 0) {
@@ -371,7 +374,7 @@ function moveTongue() {
             tongue.isRetracting = true;
         }
     } else if (tongue.isRetracting) {
-        tongue.currentLength -= tongue.speed;
+        tongue.currentLength -= TONGUE_RETRACT_SPEED;
         if (tongue.currentLength <= 0) {
             tongue.currentLength = 0;
             tongue.isRetracting = false;
@@ -461,16 +464,16 @@ function drawDebugInfo(currentTime) {
     if (gameState.phase === 'playing') {
         timeToNextSpawn = gameState.nextSpawnTime - currentTime;
     }
-    const playerMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
     const currentMeanSpeed = MEAN_BALL_SPEED_GRIDS * gameState.gameSpeedMultiplier;
     const currentVariation = currentMeanSpeed * BALL_SPEED_VARIATION_RATIO;
 
     ctx.fillText(`Level: ${gameState.level}`, canvas.width - 10, 15);
-    ctx.fillText(`Player Interval: ${playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
+    ctx.fillText(`Player Interval: ${gameState.playerMoveInterval.toFixed(1)}ms`, canvas.width - 10, 29);
     ctx.fillText(`Seed Spd: ${currentMeanSpeed.toFixed(3)} ±${currentVariation.toFixed(3)}`, canvas.width - 10, 43);
     ctx.fillText(`PlayerX: ${player.xGrids.toFixed(2)}`, canvas.width - 10, 57);
     const spawnTimerText = `Next Spawn: ${timeToNextSpawn.toFixed(0)}ms`;
     ctx.fillText(spawnTimerText, canvas.width - 10, 71);
+    ctx.fillText(`Tongue Spd: ${gameState.tongueSpeed.toFixed(3)}`, canvas.width - 10, 85);
     ctx.textAlign = 'left'; // Reset to default
 }
 
@@ -830,6 +833,8 @@ function resetGame() {
     gameState.lastAnimationTime = 0;
     gameState.nextSpawnTime = 0;
     gameState.ballSpawnInterval = BALL_SPAWN_INTERVAL;
+    gameState.tongueSpeed = INITIAL_TONGUE_SPEED;
+    gameState.playerMoveInterval = INITIAL_PLAYER_MOVE_INTERVAL;
 
     // Reset player
     player.xGrids = SCREEN_WIDTH_GRIDS / 2 - CHAR_SIZE_GRIDS / 2;
@@ -852,8 +857,7 @@ function resetGame() {
     repairQueue.length = 0;
 }
 
-let lastMoveTime = 0;
-const MOVE_INTERVAL = 50; // ms, adjust for desired speed
+    let lastMoveTime = 0;
 let animationFrameId;
 
 function update(currentTime) {
@@ -901,9 +905,17 @@ function updateGameLogic(currentTime) {
                 const speedIncrease = tier.getSpeedIncrease(levelToProcess);
                 gameState.gameSpeedMultiplier += speedIncrease;
 
+                // Update tongue speed
+                const tongueSpeedIncrease = tier.getTongueSpeedIncrease(levelToProcess);
+                gameState.tongueSpeed += tongueSpeedIncrease;
+
                 // Update spawn interval
                 const intervalReduction = tier.getSpawnIntervalReduction(levelToProcess);
                 gameState.ballSpawnInterval -= intervalReduction;
+
+                // Update player move interval
+                const playerIntervalReduction = tier.getPlayerMoveIntervalReduction(levelToProcess);
+                gameState.playerMoveInterval -= playerIntervalReduction;
             }
         }
 
@@ -940,7 +952,7 @@ function updateGameLogic(currentTime) {
         player.currentFrame = 0; // Reset to first frame when not moving
     }
     
-    const currentMoveInterval = MOVE_INTERVAL / gameState.gameSpeedMultiplier;
+    const currentMoveInterval = gameState.playerMoveInterval;
     if (currentTime - lastMoveTime > currentMoveInterval) {
         movePlayer();
         lastMoveTime = currentTime;
