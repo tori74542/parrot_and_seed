@@ -30,9 +30,9 @@ export const difficultyTiers = [
     },
     // For levels 6-10, the difficulty ramps up.
     {
-        levelCap: 10,
-        getSpeedIncrease: (level) => 0.10,
-        getSpawnIntervalReduction: (level) => 60, // ms
+        levelCap: 8,
+        getSpeedIncrease: (level) => 0.15,
+        getSpawnIntervalReduction: (level) => 100, // ms
         getTongueSpeedIncrease: (level) => 0.02,
         getPlayerMoveIntervalReduction: (level) => 2 // ms
     },
@@ -40,7 +40,7 @@ export const difficultyTiers = [
     {
         levelCap: 15,
         getSpeedIncrease: (level) => 0.10,
-        getSpawnIntervalReduction: (level) => 60, // ms
+        getSpawnIntervalReduction: (level) => 50, // ms
         getTongueSpeedIncrease: (level) => 0.00,
         getPlayerMoveIntervalReduction: (level) => 0 // ms
     },
