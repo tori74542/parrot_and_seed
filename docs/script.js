@@ -443,8 +443,9 @@ function drawBalls() {
 
 function drawScore() {
     ctx.globalAlpha = 1; // Ensure full opacity for main score
-    ctx.fillStyle = 'black';
-    ctx.font = '20px "Courier New"';
+    // Set color based on game phase
+    ctx.fillStyle = (gameState.phase === 'gameOver') ? 'white' : 'black';
+    ctx.font = '20px "DotGothic16"';
     ctx.textAlign = 'center'; // Explicitly set alignment for centering
 
     const paddedScore = gameState.score.toString().padStart(6, '0');
@@ -464,7 +465,7 @@ function drawDebugInfo(currentTime) {
     if (!DEBUG_MODE) return;
     ctx.globalAlpha = 1;
     ctx.fillStyle = 'rgba(255, 0, 0, 0.8)'; // Red for debug text
-    ctx.font = '12px "Courier New"';
+    ctx.font = '12px "DotGothic16"';
     ctx.textAlign = 'right';
 
     // Only update the spawn timer during the 'playing' phase to prevent it from
@@ -487,11 +488,18 @@ function drawDebugInfo(currentTime) {
 }
 
 function drawTitleScreen() {
-    // This function is called only when gameState.isTitleScreen is true
+    // This function is called only when gameState.phase is 'title'
     ctx.fillStyle = 'black';
-    ctx.font = '20px "Courier New"';
+    ctx.font = '16px "DotGothic16"'; // Smaller font for instructions
     ctx.textAlign = 'center';
-    ctx.fillText('parrot and seed', canvas.width / 2, canvas.height / 2);
+
+    const lineHeight = 25;
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    ctx.fillText('右: C or →', centerX, centerY - lineHeight);
+    ctx.fillText('左: Z or ←', centerX, centerY);
+    ctx.fillText('舌: Enter  ', centerX, centerY + lineHeight);
 }
 
 function drawGameOverScreen() {
@@ -500,12 +508,9 @@ function drawGameOverScreen() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.fillStyle = 'white';
-    ctx.font = '40px "Courier New"';
+    ctx.font = '20px "DotGothic16"';
     ctx.textAlign = 'center';
-    ctx.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
-
-    ctx.font = '20px "Courier New"';
-    ctx.fillText('Press any key to restart', canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText('game over', canvas.width / 2, canvas.height / 2);
 }
 
 function drawFloatingScores() {
@@ -526,7 +531,7 @@ function drawFloatingScores() {
         const alpha = 1 - (elapsedTime / FADE_DURATION); // Fade out
         ctx.globalAlpha = alpha;
         ctx.fillStyle = 'black';
-        ctx.font = 'bold 12px "Courier New"';
+        ctx.font = 'bold 12px "DotGothic16"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -550,7 +555,7 @@ function drawScoreTiers() {
     ctx.setLineDash([5, 3]); // Set to a dashed line
     ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Red, semi-transparent
     ctx.lineWidth = 1;
-    ctx.font = 'bold 12px "Courier New"';
+    ctx.font = 'bold 12px "DotGothic16"';
     ctx.fillStyle = 'rgba(255, 0, 0, 0.7)'; // Red, semi-transparent
     ctx.textAlign = 'left';
 
@@ -931,6 +936,7 @@ function update(currentTime) {
         drawTitleScreen();
     } else if (gameState.phase === 'gameOver') {
         drawGameOverScreen();
+        drawScore(); // Draw score on top of the overlay
     }
 
     animationFrameId = requestAnimationFrame(update);
@@ -1129,10 +1135,19 @@ async function startGame() {
         console.error("Could not load game assets:", error);
         // Display a user-friendly error message on the canvas
         ctx.fillStyle = 'red';
-        ctx.font = '16px "Courier New"';
+        ctx.font = '16px "DotGothic16"';
         ctx.textAlign = 'center';
         ctx.fillText('Error: Could not load game assets.', canvas.width / 2, canvas.height / 2);
     }
 }
+
+// Prevent scrolling and zooming on mobile
+window.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('wheel', function(e) {
+    e.preventDefault();
+}, { passive: false });
 
 startGame();

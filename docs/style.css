@@ -1,4 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&display=swap');
+
 body {
+    overflow: hidden; /* Prevent scrolling of the entire page */
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -18,6 +21,7 @@ body {
 }
 
 canvas {
+    touch-action: none; /* Disable pinch-to-zoom and other gestures on the canvas */
     width: 100%; /* コンテナに合わせて伸縮 */
     height: auto; /* アスペクト比を維持 */
     border: 1px solid black;
@@ -27,16 +31,28 @@ canvas {
 #touch-controls {
     /* Initially hidden. Shown via media query for touch devices. */
     display: none;
-    justify-content: space-between;
+    justify-content: space-between; /* This will push the two main containers apart */
     align-items: center; /* Align items vertically */
     width: 100%;
     margin-top: 10px;
     box-sizing: border-box;
 }
 
-.movement-controls {
+.movement-controls, .action-controls {
+    width: 50%; /* Each container takes up half the width */
     display: flex;
+    justify-content: center; /* Center the button(s) within their container */
+    align-items: center;
+}
+
+/* To keep movement buttons grouped but centered in their half */
+.movement-controls {
+    justify-content: center; /* Align to the center of its half */
     gap: 20px; /* Space between left/right buttons */
+}
+
+.action-controls {
+    justify-content: center; /* Center the tongue button in its half */
 }
 
 #touch-controls button {
