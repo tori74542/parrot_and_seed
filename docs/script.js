@@ -1141,4 +1141,13 @@ async function startGame() {
     }
 }
 
+// Prevent scrolling and zooming on mobile
+window.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('wheel', function(e) {
+    e.preventDefault();
+}, { passive: false });
+
 startGame();
